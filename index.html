@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Спеллинг‑тренажёр — браузер (v1)</title>
+  <title>Спеллинг‑тренажёр — браузер (v2)</title>
   <style>
     :root{--bg:#fbfbfd;--panel:#ffffff;--ink:#15171a;--muted:#6b7280;--accent:#2563eb;--good:#16a34a;--bad:#dc2626;--soft:#eef2ff;--border:#e5e7eb}
     *{box-sizing:border-box}
@@ -38,12 +38,13 @@
     .right{display:flex;justify-content:flex-end;gap:8px}
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
     @media(max-width:600px){ input[type="text"]{font-size:18px} .btn{padding:12px 14px} }
+    .small{font-size:12px;color:var(--muted)}
   </style>
 </head>
 <body>
   <header>
     <div class="wrap">
-      <h1>Спеллинг‑тренажёр — браузер <span class="badge">v1</span></h1>
+      <h1>Спеллинг‑тренажёр — браузер <span class="badge">v2</span></h1>
       <div class="row">
         <div class="stat">⏱️ <span class="muted">Время:</span> <span id="timer" class="timer">00:00</span></div>
         <div class="stat">🎯 <span class="muted">Точность:</span> <span id="acc">—</span></div>
@@ -60,12 +61,12 @@
   <main class="wrap" style="margin-top:12px">
     <div class="grid">
       <section class="panel">
-        <label for="raw">Слова (через запятую, пробел или с новой строки)</label>
-        <textarea id="raw" placeholder="cat
-beautiful
-necessary, schedule, rhythm"></textarea>
+        <label for="raw">Слова или текст (можно вставить абзац с PDF/сайта)</label>
+        <textarea id="raw" placeholder="Вставь текст или список слов"></textarea>
+        <div class="small">Совет: я автоматически починю переносы по дефису, символы fi/fl‑лигатур и т. п.</div>
         <div class="row" style="margin-top:8px">
           <button class="btn" id="toListBtn">Преобразуй в список</button>
+          <button class="btn ghost" id="smartCleanBtn" title="Очистить текст (де‑переносы, лигатуры)">Очистить текст</button>
           <button class="btn ghost" id="shuffleBtn" title="Перемешать текущий список">Перемешать</button>
           <label class="chip"><input type="checkbox" id="caseSensitive"> Учитывать регистр</label>
         </div>
@@ -90,8 +91,24 @@ necessary, schedule, rhythm"></textarea>
         <div class="row" style="margin-top:10px">
           <button class="btn primary" id="startBtn">Start quiz</button>
           <button class="btn" id="errorsOnlyBtn" disabled>Повторить ошибки</button>
+          <button class="btn" id="workMistakesBtn" disabled>Работа над ошибками</button>
           <button class="btn" id="clearErrorsBtn" disabled>Очистить ошибки</button>
         </div>
+
+        <details style="margin-top:10px">
+          <summary>💾 Списки: Save / Load / Share</summary>
+          <div class="row" style="margin-top:8px">
+            <input type="text" id="listName" placeholder="Название списка" style="min-width:200px">
+            <button class="btn" id="saveListBtn">Сохранить локально</button>
+            <select id="savedLists" style="min-width:200px"></select>
+            <button class="btn" id="loadListBtn">Загрузить</button>
+            <button class="btn" id="deleteListBtn" title="Удалить выбранный список">Удалить</button>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <button class="btn" id="shareLinkBtn" title="Создать ссылку с этим списком">Поделиться ссылкой</button>
+            <input type="text" id="shareLinkOut" readonly style="min-width:380px" placeholder="ссылка появится здесь">
+          </div>
+        </details>
       </section>
 
       <section class="panel">
@@ -123,7 +140,7 @@ necessary, schedule, rhythm"></textarea>
   <script>
   (function(){
     const $ = (s)=>document.querySelector(s);
-    const raw=$('#raw'), toListBtn=$('#toListBtn'), shuffleBtn=$('#shuffleBtn');
+    const raw=$('#raw'), toListBtn=$('#toListBtn'), smartCleanBtn=$('#smartCleanBtn'), shuffleBtn=$('#shuffleBtn');
     const countEl=$('#count'), accEl=$('#acc'), timerEl=$('#timer');
     const startBtn=$('#startBtn'), pauseBtn=$('#pauseBtn'), resumeBtn=$('#resumeBtn'), resetTimerBtn=$('#resetTimerBtn');
     const modeRadios=document.querySelectorAll('input[name="mode"]'); const caseSensitive=$('#caseSensitive');
@@ -133,21 +150,43 @@ necessary, schedule, rhythm"></textarea>
     const cnv=$('#cnv'), ctx=cnv.getContext('2d'); const dpr=window.devicePixelRatio||1;
     const answerRow=$('#answerRow'), answer=$('#answer'), checkBtn=$('#checkBtn');
     const repeatBtn=$('#repeatBtn'), revealBtn=$('#revealBtn'), skipBtn=$('#skipBtn'), progress=$('#progress'), feedback=$('#feedback');
-    const mistakesList=$('#mistakes'), errorsOnlyBtn=$('#errorsOnlyBtn'), clearErrorsBtn=$('#clearErrorsBtn');
+    const mistakesList=$('#mistakes'), errorsOnlyBtn=$('#errorsOnlyBtn'), workMistakesBtn=$('#workMistakesBtn'), clearErrorsBtn=$('#clearErrorsBtn');
+    const listName=$('#listName'), saveListBtn=$('#saveListBtn'), savedLists=$('#savedLists'), loadListBtn=$('#loadListBtn'), deleteListBtn=$('#deleteListBtn');
+    const shareLinkBtn=$('#shareLinkBtn'), shareLinkOut=$('#shareLinkOut');
 
-    const store={ saveLast:(w)=>localStorage.setItem('sptr:last', JSON.stringify(w)),
+    const store={
+      saveLast:(w)=>localStorage.setItem('sptr:last', JSON.stringify(w)),
       loadLast:()=>{try{return JSON.parse(localStorage.getItem('sptr:last')||'[]')}catch(e){return []}},
+      saveNamed:(n,w)=>{const a=store._all(); a[n]=w; localStorage.setItem('sptr:named', JSON.stringify(a));},
+      loadNamed:(n)=>store._all()[n]||[],
+      removeNamed:(n)=>{const a=store._all(); delete a[n]; localStorage.setItem('sptr:named', JSON.stringify(a));},
+      names:()=>Object.keys(store._all()).sort(),
+      _all:()=>{try{return JSON.parse(localStorage.getItem('sptr:named')||'{}')}catch(e){return {}}},
       saveLookSecs:(v)=>localStorage.setItem('sptr:lookSecs', String(v)),
-      loadLookSecs:()=>{const v=parseFloat(localStorage.getItem('sptr:lookSecs')); return isFinite(v)?v:2;} };
+      loadLookSecs:()=>{const v=parseFloat(localStorage.getItem('sptr:lookSecs')); return isFinite(v)?v:2;}
+    };
 
     const state={ words:[], idx:0, attempts:0, correct:0, running:false,
       timerOn:false,startTs:0, elapsed:0, mode:()=>document.querySelector('input[name="mode"]:checked').value,
       phase:'idle', mistakes:[], lookTimer:null, ttsPrimed:false };
 
-    // utils
-    const sanitize=(s)=> (s||'').replace(/[\\s\\n\\r\\t]+/g,' ').trim();
-    const splitWords=(t)=> sanitize(t).split(/[\\,;\\n\\r\\t ]+/).map(w=>w.trim()).filter(Boolean);
-    function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+    // ---- CLEANERS ----
+    const ligMap = {'\ufb00':'ff','\ufb01':'fi','\ufb02':'fl','\ufb03':'ffi','\ufb04':'ffl'}; // ff, fi, fl, ffi, ffl
+    function cleanText(text){
+      return text
+        .replace(/[\u00AD\u200B\u200C\u200D\u2060]/g,'')               // soft hyphen & zero-width
+        .replace(/([A-Za-z])-\s*\n\s*([A-Za-z])/g, '$1$2')            // dehyphenate across line break
+        .replace(/[\ufb00-\ufb04]/g, ch=>ligMap[ch]||ch)              // normalize ligatures
+        .replace(/\r/g,'\n');
+    }
+    function extractWords(text){
+      text = cleanText(text);
+      const out=[]; const re=/[A-Za-z]+(?:'[A-Za-z]+)?/g; let m;
+      while((m=re.exec(text))){ out.push(m[0]); }
+      return out;
+    }
+
+    // ---- UI helpers ----
     function displayCount(){ countEl.textContent=String(state.words.length); progress.textContent=String(Math.min(state.idx+1,state.words.length))+' / '+String(state.words.length); }
     function accuracy(){ return state.attempts? Math.round(100*state.correct/state.attempts): null; }
     function showAcc(){ const a=accuracy(); accEl.textContent=(a==null? '—' : (state.correct+' / '+state.attempts+' ('+a+'%)')); }
@@ -164,7 +203,7 @@ necessary, schedule, rhythm"></textarea>
     function resizeCanvas(){ const r=cnv.getBoundingClientRect(); const w=Math.max(1,Math.floor(r.width*dpr)); const h=Math.max(1,Math.floor(r.height*dpr)); if(cnv.width!==w||cnv.height!==h){ cnv.width=w; cnv.height=h; } ctx.setTransform(1,0,0,1,0,0); ctx.scale(dpr,dpr); }
     function clearCanvas(){ ctx.clearRect(0,0,cnv.width,cnv.height); }
     function drawTextCentered(text, opts){ opts=opts||{}; resizeCanvas(); clearCanvas(); const r=cnv.getBoundingClientRect(); let w=r.width, h=r.height; let fontSize=opts.fontSize||32; const fam=opts.fontFamily||'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial'; ctx.fillStyle=opts.color||'#15171a'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='600 '+fontSize+'px '+fam; while(ctx.measureText(text).width>w*0.9 && fontSize>14){ fontSize -= 2; ctx.font='600 '+fontSize+'px '+fam; } ctx.fillText(text, w/2, h/2); }
-    const maskWord=(w)=> w.replace(/\\S/g,'•');
+    const maskWord=(w)=> w.replace(/\S/g,'•');
 
     // TTS (dictation)
     let voices=[]; const hasTTS=('speechSynthesis' in window);
@@ -176,8 +215,8 @@ necessary, schedule, rhythm"></textarea>
 
     // core
     function setWords(words){ state.words=words.slice(); state.idx=0; displayCount(); store.saveLast(state.words); }
-    function ensureWords(){ if(state.words.length) return true; const candidate=splitWords(raw.value); if(candidate.length){ setWords(candidate); return true; } drawTextCentered('Добавь слова и нажми «Преобразуй в список»',{fontSize:18}); return false; }
-    function startQuiz(){ const ui=splitWords(raw.value); if(ui.length){ setWords(ui); } else if(!ensureWords()) return; state.running=true; state.attempts=0; state.correct=0; state.mistakes=[]; showAcc(); mistakesList.innerHTML=''; displayCount(); state.idx=0; answer.value=''; if(state.mode()==='lcwc'){ enterLook(); } else { dictationStart(); } startTimer(); enableRunBtns(true); }
+    function ensureWords(){ if(state.words.length) return true; const candidate=extractWords(raw.value); if(candidate.length){ setWords(candidate); return true; } drawTextCentered('Добавь слова и нажми «Преобразуй в список»',{fontSize:18}); return false; }
+    function startQuiz(){ const ui=extractWords(raw.value); if(ui.length){ setWords(ui); } else if(!ensureWords()) return; state.running=true; state.attempts=0; state.correct=0; state.mistakes=[]; showAcc(); mistakesList.innerHTML=''; displayCount(); state.idx=0; answer.value=''; if(state.mode()==='lcwc'){ enterLook(); } else { dictationStart(); } startTimer(); enableRunBtns(true); }
     function enableRunBtns(e){ [repeatBtn,revealBtn,skipBtn,checkBtn].forEach(b=>b.disabled=!e); pauseBtn.disabled=!e || !state.timerOn; resetTimerBtn.disabled=!e && state.elapsed===0; answerRow.style.display=e? 'flex':'none'; }
     function nextWord(){ state.idx=(state.idx+1)%Math.max(1,state.words.length); displayCount(); }
     function clearLookTimer(){ if(state.lookTimer){ clearTimeout(state.lookTimer); state.lookTimer=null; } }
@@ -189,26 +228,56 @@ necessary, schedule, rhythm"></textarea>
     function repeat(){ if(state.mode()==='lcwc'){ enterLook(); } else { dictate(); } }
     function reveal(){ const w=state.words[state.idx]||''; drawTextCentered(w,{fontSize:32}); }
     function skip(){ if(state.mode()==='lcwc'){ nextWord(); enterLook(); } else { nextWord(); renderDictation(true); } }
-    function checkAnswer(){ const w=state.words[state.idx]||''; const typedRaw=answer.value||''; const typed=caseSensitive.checked? typedRaw.trim(): typedRaw.trim().toLowerCase(); const target=caseSensitive.checked? w.trim(): w.trim().toLowerCase(); const ok=(typed===target); state.attempts++; if(ok) state.correct++; showAcc(); feedback.innerHTML = ok? '<span class=\"ok\">Верно!</span>' : '<span class=\"bad\">Неверно</span>: <b>'+ (typedRaw||'∅') +'</b> → <b>'+ w +'</b>'; answer.value=''; nextWord(); if(state.mode()==='lcwc'){ enterLook(); } else { renderDictation(true); } }
+    function checkAnswer(){ const w=state.words[state.idx]||''; const typedRaw=answer.value||''; const typed=caseSensitive.checked? typedRaw.trim(): typedRaw.trim().toLowerCase(); const target=caseSensitive.checked? w.trim(): w.trim().toLowerCase(); const ok=(typed===target); state.attempts++; if(ok) state.correct++; showAcc(); feedback.innerHTML = ok? '<span class="ok">Верно!</span>' : '<span class="bad">Неверно</span>: <b>'+ (typedRaw||'∅') +'</b> → <b>'+ w +'</b>'; if(!ok){ state.mistakes.push({word:w, typed:typedRaw}); appendMistake(w, typedRaw); errorsOnlyBtn.disabled=false; workMistakesBtn.disabled=false; clearErrorsBtn.disabled=false; } answer.value=''; nextWord(); if(state.mode()==='lcwc'){ enterLook(); } else { renderDictation(true); } }
     function lookSecs(){ return Math.max(0, Math.min(10, parseFloat(lookSecsInput.value)||2)); }
 
+    function appendMistake(word, typed){ const li=document.createElement('li'); li.textContent='• '+word+' — вы ввели: '+(typed||'∅'); mistakesList.appendChild(li); }
+
+    // Errors Only / Работа над ошибками
+    function errorsOnly(){ if(!state.mistakes.length) return; const uniq=[...new Set(state.mistakes.map(m=>m.word))]; if(!uniq.length){ drawTextCentered('Ошибок нет',{fontSize:18}); return; } setWords(uniq); feedback.textContent='Повторяем только ошибки'; if(state.mode()==='lcwc'){ enterLook(); } else { renderDictation(true); } errorsOnlyBtn.disabled=true; workMistakesBtn.disabled=true; }
+    function clearErrors(){ state.mistakes=[]; mistakesList.innerHTML=''; errorsOnlyBtn.disabled=true; workMistakesBtn.disabled=true; clearErrorsBtn.disabled=true; }
+
+    // Smart Clean
+    function smartClean(){ const cleaned = cleanText(raw.value); raw.value = cleaned; alert('Текст очищен: переноси по дефису и лигатуры исправлены. Теперь нажми «Преобразуй в список».'); }
+
+    // Share link (no server): encode list into URL hash
+    function encodeShare(words, name){ const payload = JSON.stringify({name, words, ts:Date.now()}); const b64 = btoa(unescape(encodeURIComponent(payload))); return location.origin + location.pathname + '#list=' + b64; }
+    function decodeShare(){ const m = location.hash.match(/#list=([A-Za-z0-9+/=]+)/); if(!m) return null; try{ const json = decodeURIComponent(escape(atob(m[1]))); return JSON.parse(json); }catch(e){ return null; } }
+
+    function refreshSaved(){ const names=store.names(); savedLists.innerHTML=names.map(n=>'<option value="'+n+'">'+n+'</option>').join(''); }
+
     // events
-    toListBtn.addEventListener('click', ()=>{ const words=splitWords(raw.value); setWords(words); drawTextCentered('Список готов: '+words.length,{fontSize:18}); });
-    shuffleBtn.addEventListener('click', ()=>{ if(!state.words.length) setWords(splitWords(raw.value)); shuffle(state.words); drawTextCentered('Перемешали порядок',{fontSize:18}); displayCount(); });
+    toListBtn.addEventListener('click', ()=>{ const words=extractWords(raw.value); setWords(words); drawTextCentered('Список готов: '+words.length,{fontSize:18}); });
+    smartCleanBtn.addEventListener('click', smartClean);
+    shuffleBtn.addEventListener('click', ()=>{ if(!state.words.length) setWords(extractWords(raw.value)); for(let i=state.words.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [state.words[i],state.words[j]]=[state.words[j],state.words[i]]; } drawTextCentered('Перемешали порядок',{fontSize:18}); displayCount(); });
+
     startBtn.addEventListener('click', ()=>{ if(state.mode()==='dictation') primeTTS(); startQuiz(); });
-    pauseBtn.addEventListener('click', ()=>{ state.elapsed += Date.now()-state.startTs; state.timerOn=false; feedback.textContent='Пауза'; });
-    resumeBtn.addEventListener('click', ()=>{ if(!state.timerOn){ state.timerOn=true; state.startTs=Date.now(); } feedback.textContent='Продолжаем'; answer.focus({preventScroll:false}); });
+    pauseBtn.addEventListener('click', ()=>{ pauseTimer(); feedback.textContent='Пауза'; });
+    resumeBtn.addEventListener('click', ()=>{ startTimer(); feedback.textContent='Продолжаем'; answer.focus({preventScroll:false}); });
     resetTimerBtn.addEventListener('click', resetTimer);
+
     repeatBtn.addEventListener('click', repeat); revealBtn.addEventListener('click', reveal); skipBtn.addEventListener('click', skip);
     checkBtn.addEventListener('click', ()=>checkAnswer());
     answer.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); checkAnswer(); } });
 
+    errorsOnlyBtn.addEventListener('click', errorsOnly);
+    workMistakesBtn.addEventListener('click', errorsOnly);
+    clearErrorsBtn.addEventListener('click', clearErrors);
+
+    saveListBtn.addEventListener('click', ()=>{ const name=(listName.value||'').trim(); if(!name){ alert('Название списка'); return; } const words=state.words.length? state.words : extractWords(raw.value); if(!words.length){ alert('Нет слов для сохранения'); return; } const all=store._all(); all[name]=words; localStorage.setItem('sptr:named', JSON.stringify(all)); refreshSaved(); savedLists.value=name; alert('Сохранено локально ✔'); });
+    loadListBtn.addEventListener('click', ()=>{ const name=savedLists.value; if(!name){ alert('Нет сохранённых списков'); return;} const w=store.loadNamed(name); setWords(w); raw.value=w.join('\\n'); drawTextCentered('Загружен список «'+name+'» ('+w.length+')',{fontSize:18}); });
+    deleteListBtn.addEventListener('click', ()=>{ const name=savedLists.value; if(!name) return; if(confirm('Удалить список «'+name+'»?')){ store.removeNamed(name); refreshSaved(); drawTextCentered('Список удалён',{fontSize:18}); } });
+
+    shareLinkBtn.addEventListener('click', ()=>{ const name=(listName.value||'').trim() || 'list'; const words=state.words.length? state.words : extractWords(raw.value); if(!words.length){ alert('Нет слов для ссылки'); return; } const url=encodeShare(words, name); shareLinkOut.value=url; shareLinkOut.select(); try{ document.execCommand('copy'); }catch(e){} });
+
+    // canvas helpers
+    function drawTextCentered(text, opts){ opts=opts||{}; resizeCanvas(); clearCanvas(); const r=cnv.getBoundingClientRect(); let w=r.width; let fontSize=opts.fontSize||32; const fam=opts.fontFamily||'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial'; ctx.fillStyle=opts.color||'#15171a'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='600 '+fontSize+'px '+fam; while(ctx.measureText(text).width>w*0.9 && fontSize>14){ fontSize -= 2; ctx.font='600 '+fontSize+'px '+fam; } ctx.fillText(text, w/2, cnv.getBoundingClientRect().height/2); }
+
     // init
-    const last=store.loadLast(); if(last.length){ setWords(last); raw.value=last.join('\\n'); }
-    document.addEventListener('visibilitychange', ()=>{ if(document.hidden && state.timerOn){ state.elapsed += Date.now()-state.startTs; state.timerOn=false; } });
-    lookSecsInput.value=store.loadLookSecs();
-    if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>{ voices=window.speechSynthesis.getVoices(); fillVoices(); }; }
-    drawTextCentered('Нажми Start quiz, чтобы начать',{fontSize:18});
+    function initFromHash(){ const payload=decodeShare(); if(payload && Array.isArray(payload.words)){ setWords(payload.words); raw.value = payload.words.join('\\n'); if(payload.name) listName.value=payload.name; drawTextCentered('Загружен общий список «'+(payload.name||'list')+'» ('+payload.words.length+')',{fontSize:18}); } }
+    function init(){ const last=store.loadLast(); if(last.length){ setWords(last); raw.value=last.join('\\n'); } refreshSaved(); lookSecsInput.value=store.loadLookSecs(); drawTextCentered('Нажми Start quiz, чтобы начать',{fontSize:18}); initFromHash(); }
+    window.addEventListener('hashchange', initFromHash);
+    init();
   })();
   </script>
 </body>
