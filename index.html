@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Спеллинг‑тренажёр — браузер (v1)</title>
+  <style>
+    :root{--bg:#fbfbfd;--panel:#ffffff;--ink:#15171a;--muted:#6b7280;--accent:#2563eb;--good:#16a34a;--bad:#dc2626;--soft:#eef2ff;--border:#e5e7eb}
+    *{box-sizing:border-box}
+    body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--ink);background:var(--bg);padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+    header{position:sticky;top:0;background:rgba(251,251,253,.85);backdrop-filter:saturate(150%) blur(8px);border-bottom:1px solid var(--border);z-index:5}
+    .wrap{max-width:1100px;margin:0 auto;padding:14px 18px}
+    h1{font-size:20px;margin:0 0 6px;display:flex;align-items:center;gap:10px}
+    .badge{font-size:12px;border:1px solid var(--border);border-radius:999px;padding:3px 8px;color:var(--muted);background:#fff}
+    .grid{display:grid;gap:14px}
+    @media(min-width:980px){.grid{grid-template-columns:360px 1fr}}
+    section.panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px}
+    label{font-weight:600}
+    textarea{width:100%;min-height:140px;resize:vertical;border:1px solid var(--border);border-radius:12px;padding:10px}
+    input[type="text"], select{width:100%;border:1px solid var(--border);border-radius:10px;padding:12px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .row > *{flex:0 0 auto}
+    .btn{appearance:none;border:1px solid var(--border);background:#fff;border-radius:10px;padding:10px 12px;cursor:pointer}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+    .btn.ghost{background:var(--soft)}
+    .stat{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;background:#fff;border:1px solid var(--border);border-radius:999px;font-size:14px}
+    .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:999px;padding:4px 10px;background:#fff}
+    .muted{color:var(--muted)}
+    .timer{font-variant-numeric:tabular-nums;font-weight:700}
+    .board{min-height:160px;border:1px dashed var(--border);border-radius:12px;padding:0;display:flex;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden}
+    #cnv{width:100%;height:160px;display:block}
+    .ok{color:var(--good)} .bad{color:var(--bad)}
+    .kbd{font:12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;background:#f3f4f6;border:1px solid var(--border);padding:2px 6px;border-radius:6px}
+    details summary{cursor:pointer}
+    .mistakes{max-height:160px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:10px;background:#fff}
+    .mistakes li{margin:6px 0}
+    .right{display:flex;justify-content:flex-end;gap:8px}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(max-width:600px){ input[type="text"]{font-size:18px} .btn{padding:12px 14px} }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Спеллинг‑тренажёр — браузер <span class="badge">v1</span></h1>
+      <div class="row">
+        <div class="stat">⏱️ <span class="muted">Время:</span> <span id="timer" class="timer">00:00</span></div>
+        <div class="stat">🎯 <span class="muted">Точность:</span> <span id="acc">—</span></div>
+        <div class="stat">🧩 <span class="muted">Слов:</span> <span id="count">0</span></div>
+        <div class="right" style="margin-left:auto">
+          <button class="btn" id="pauseBtn" disabled>Пауза</button>
+          <button class="btn" id="resumeBtn" disabled>Продолжить</button>
+          <button class="btn" id="resetTimerBtn" disabled>Сброс таймера</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap" style="margin-top:12px">
+    <div class="grid">
+      <section class="panel">
+        <label for="raw">Слова (через запятую, пробел или с новой строки)</label>
+        <textarea id="raw" placeholder="cat
+beautiful
+necessary, schedule, rhythm"></textarea>
+        <div class="row" style="margin-top:8px">
+          <button class="btn" id="toListBtn">Преобразуй в список</button>
+          <button class="btn ghost" id="shuffleBtn" title="Перемешать текущий список">Перемешать</button>
+          <label class="chip"><input type="checkbox" id="caseSensitive"> Учитывать регистр</label>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+        <div class="row">
+          <label>Режим:</label>
+          <label class="chip"><input type="radio" name="mode" value="lcwc" checked> Look → Cover → Write → Check</label>
+          <label class="chip"><input type="radio" name="mode" value="dictation"> Диктовка</label>
+        </div>
+        <div class="row" id="lookRow" style="margin-top:6px">
+          <label class="chip"><span class="muted">Показ слова</span>
+            <input type="number" id="lookSecs" min="0" max="10" step="0.5" value="2" style="width:90px"> сек
+          </label>
+        </div>
+        <div class="row" id="voiceRow" style="display:none;margin-top:6px">
+          <label class="chip" title="Голос для диктовки" style="min-width:260px"><span class="muted">Voice</span>
+            <select id="voiceSelect" style="min-width:220px"></select>
+          </label>
+          <label class="chip"><span class="muted">Rate</span> <input type="range" id="rate" min="0.7" max="1.3" step="0.05" value="1" style="width:160px"></label>
+          <span id="ttsWarn" class="muted" style="display:none">Речь недоступна в этом браузере.</span>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn primary" id="startBtn">Start quiz</button>
+          <button class="btn" id="errorsOnlyBtn" disabled>Повторить ошибки</button>
+          <button class="btn" id="clearErrorsBtn" disabled>Очистить ошибки</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="board"><canvas id="cnv" width="1000" height="160"></canvas></div>
+        <div id="answerRow" class="row" style="margin-top:12px;display:none">
+          <input type="text" id="answer" placeholder="Введите слово и нажмите Enter"
+                 autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
+                 inputmode="latin">
+          <button class="btn" id="checkBtn">Check</button>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn" id="repeatBtn" disabled>Repeat</button>
+          <button class="btn" id="revealBtn" disabled>Reveal</button>
+          <button class="btn" id="skipBtn" disabled>Skip</button>
+          <span class="muted" id="progress" style="margin-left:auto">0 / 0</span>
+        </div>
+        <div id="feedback" class="muted" style="min-height:24px;margin-top:8px"></div>
+        <details style="margin-top:10px"><summary>Ошибки</summary><ul id="mistakes" class="mistakes"></ul></details>
+      </section>
+    </div>
+    <section class="panel" style="margin-top:14px">
+      <strong>Подсказки:</strong>
+      <div class="muted" style="margin-top:6px">
+        <span class="kbd">Enter</span> — Check / далее • <span class="kbd">R</span> — Repeat • <span class="kbd">S</span> — Skip • <span class="kbd">V</span> — Reveal • <span class="kbd">Space</span> — Пауза/Продолжить
+      </div>
+    </section>
+  </main>
+
+  <script>
+  (function(){
+    const $ = (s)=>document.querySelector(s);
+    const raw=$('#raw'), toListBtn=$('#toListBtn'), shuffleBtn=$('#shuffleBtn');
+    const countEl=$('#count'), accEl=$('#acc'), timerEl=$('#timer');
+    const startBtn=$('#startBtn'), pauseBtn=$('#pauseBtn'), resumeBtn=$('#resumeBtn'), resetTimerBtn=$('#resetTimerBtn');
+    const modeRadios=document.querySelectorAll('input[name="mode"]'); const caseSensitive=$('#caseSensitive');
+    const lookRow=$('#lookRow'), lookSecsInput=$('#lookSecs');
+    const voiceRow=$('#voiceRow'), voiceSelect=$('#voiceSelect'), rate=$('#rate'), ttsWarn=$('#ttsWarn');
+
+    const cnv=$('#cnv'), ctx=cnv.getContext('2d'); const dpr=window.devicePixelRatio||1;
+    const answerRow=$('#answerRow'), answer=$('#answer'), checkBtn=$('#checkBtn');
+    const repeatBtn=$('#repeatBtn'), revealBtn=$('#revealBtn'), skipBtn=$('#skipBtn'), progress=$('#progress'), feedback=$('#feedback');
+    const mistakesList=$('#mistakes'), errorsOnlyBtn=$('#errorsOnlyBtn'), clearErrorsBtn=$('#clearErrorsBtn');
+
+    const store={ saveLast:(w)=>localStorage.setItem('sptr:last', JSON.stringify(w)),
+      loadLast:()=>{try{return JSON.parse(localStorage.getItem('sptr:last')||'[]')}catch(e){return []}},
+      saveLookSecs:(v)=>localStorage.setItem('sptr:lookSecs', String(v)),
+      loadLookSecs:()=>{const v=parseFloat(localStorage.getItem('sptr:lookSecs')); return isFinite(v)?v:2;} };
+
+    const state={ words:[], idx:0, attempts:0, correct:0, running:false,
+      timerOn:false,startTs:0, elapsed:0, mode:()=>document.querySelector('input[name="mode"]:checked').value,
+      phase:'idle', mistakes:[], lookTimer:null, ttsPrimed:false };
+
+    // utils
+    const sanitize=(s)=> (s||'').replace(/[\\s\\n\\r\\t]+/g,' ').trim();
+    const splitWords=(t)=> sanitize(t).split(/[\\,;\\n\\r\\t ]+/).map(w=>w.trim()).filter(Boolean);
+    function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+    function displayCount(){ countEl.textContent=String(state.words.length); progress.textContent=String(Math.min(state.idx+1,state.words.length))+' / '+String(state.words.length); }
+    function accuracy(){ return state.attempts? Math.round(100*state.correct/state.attempts): null; }
+    function showAcc(){ const a=accuracy(); accEl.textContent=(a==null? '—' : (state.correct+' / '+state.attempts+' ('+a+'%)')); }
+
+    // timer
+    let tickId=null;
+    function startTimer(){ if(state.timerOn) return; state.timerOn=true; state.startTs=Date.now(); tickId=setInterval(updateTimer,250); toggleTimerBtns(); }
+    function pauseTimer(){ if(!state.timerOn) return; state.elapsed += Date.now()-state.startTs; state.timerOn=false; clearInterval(tickId); tickId=null; toggleTimerBtns(); }
+    function resetTimer(){ state.elapsed=0; if(state.timerOn){ state.startTs=Date.now(); } updateTimer(); toggleTimerBtns(); }
+    function updateTimer(){ const ms=state.timerOn? state.elapsed+(Date.now()-state.startTs): state.elapsed; const sec=Math.floor(ms/1000); const m=('0'+Math.floor(sec/60)).slice(-2); const s=('0'+(sec%60)).slice(-2); timerEl.textContent=m+':'+s; }
+    function toggleTimerBtns(){ resetTimerBtn.disabled=(state.elapsed===0 && !state.timerOn); pauseBtn.disabled=!state.timerOn; resumeBtn.disabled=state.timerOn || (!state.running && state.elapsed===0); }
+
+    // canvas
+    function resizeCanvas(){ const r=cnv.getBoundingClientRect(); const w=Math.max(1,Math.floor(r.width*dpr)); const h=Math.max(1,Math.floor(r.height*dpr)); if(cnv.width!==w||cnv.height!==h){ cnv.width=w; cnv.height=h; } ctx.setTransform(1,0,0,1,0,0); ctx.scale(dpr,dpr); }
+    function clearCanvas(){ ctx.clearRect(0,0,cnv.width,cnv.height); }
+    function drawTextCentered(text, opts){ opts=opts||{}; resizeCanvas(); clearCanvas(); const r=cnv.getBoundingClientRect(); let w=r.width, h=r.height; let fontSize=opts.fontSize||32; const fam=opts.fontFamily||'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial'; ctx.fillStyle=opts.color||'#15171a'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='600 '+fontSize+'px '+fam; while(ctx.measureText(text).width>w*0.9 && fontSize>14){ fontSize -= 2; ctx.font='600 '+fontSize+'px '+fam; } ctx.fillText(text, w/2, h/2); }
+    const maskWord=(w)=> w.replace(/\\S/g,'•');
+
+    // TTS (dictation)
+    let voices=[]; const hasTTS=('speechSynthesis' in window);
+    function fillVoices(){ if(!hasTTS) return; voiceSelect.innerHTML=''; const list=voices.length? voices : window.speechSynthesis.getVoices(); const preferred=list.filter(v=>/^en(-|$)/i.test(v.lang)); const src=preferred.length? preferred : list; src.forEach(v=>{ const o=document.createElement('option'); o.value=v.name; o.textContent=v.name+' — '+v.lang; voiceSelect.appendChild(o); }); }
+    function ensureVoicesReady(timeout){ timeout=timeout||2000; return new Promise(res=>{ if(!hasTTS) return res(false); const start=Date.now(); (function wait(){ voices=window.speechSynthesis.getVoices(); if(voices.length || Date.now()-start>timeout){ fillVoices(); res(voices.length>0); } else { setTimeout(wait,100); } })(); }); }
+    function primeTTS(){ if(!hasTTS || state.ttsPrimed) return; try{ const u=new SpeechSynthesisUtterance(' '); u.volume=0; window.speechSynthesis.speak(u); state.ttsPrimed=true; }catch(e){} }
+    function speak(text){ if(!hasTTS){ feedback.textContent='Режим диктовки недоступен (нет TTS)'; return; } window.speechSynthesis.cancel(); try{ window.speechSynthesis.resume(); }catch(e){} const u=new SpeechSynthesisUtterance(text); const v=voices[0] || window.speechSynthesis.getVoices()[0]; if(v){ u.voice=v; u.lang=v.lang; } u.rate=parseFloat(rate?.value||'1'); window.speechSynthesis.speak(u); }
+    if(hasTTS){ window.speechSynthesis.onvoiceschanged=()=>{ voices=window.speechSynthesis.getVoices(); fillVoices(); }; } else { ttsWarn.style.display='inline'; }
+
+    // core
+    function setWords(words){ state.words=words.slice(); state.idx=0; displayCount(); store.saveLast(state.words); }
+    function ensureWords(){ if(state.words.length) return true; const candidate=splitWords(raw.value); if(candidate.length){ setWords(candidate); return true; } drawTextCentered('Добавь слова и нажми «Преобразуй в список»',{fontSize:18}); return false; }
+    function startQuiz(){ const ui=splitWords(raw.value); if(ui.length){ setWords(ui); } else if(!ensureWords()) return; state.running=true; state.attempts=0; state.correct=0; state.mistakes=[]; showAcc(); mistakesList.innerHTML=''; displayCount(); state.idx=0; answer.value=''; if(state.mode()==='lcwc'){ enterLook(); } else { dictationStart(); } startTimer(); enableRunBtns(true); }
+    function enableRunBtns(e){ [repeatBtn,revealBtn,skipBtn,checkBtn].forEach(b=>b.disabled=!e); pauseBtn.disabled=!e || !state.timerOn; resetTimerBtn.disabled=!e && state.elapsed===0; answerRow.style.display=e? 'flex':'none'; }
+    function nextWord(){ state.idx=(state.idx+1)%Math.max(1,state.words.length); displayCount(); }
+    function clearLookTimer(){ if(state.lookTimer){ clearTimeout(state.lookTimer); state.lookTimer=null; } }
+    function enterLook(){ clearLookTimer(); state.phase='look'; const w=state.words[state.idx]||''; drawTextCentered(w,{fontSize:32}); answerRow.style.display='none'; feedback.textContent=''; state.lookTimer=setTimeout(()=>enterCover(), Math.max(0, lookSecs()*1000)); }
+    function enterCover(){ clearLookTimer(); state.phase='cover'; const w=state.words[state.idx]||''; drawTextCentered(maskWord(w),{fontSize:32, fontFamily:'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Courier New\", monospace'}); answerRow.style.display='flex'; answer.focus({preventScroll:false}); }
+    function renderDictation(first){ drawTextCentered('Слушай слово и напиши его',{fontSize:18}); answerRow.style.display='flex'; answer.focus({preventScroll:false}); progress.textContent=String(Math.min(state.idx+1,state.words.length))+' / '+String(state.words.length); if(first) dictate(); }
+    function dictationStart(){ primeTTS(); ensureVoicesReady().then(()=>{ voiceRow.style.display='flex'; renderDictation(true); }); }
+    function dictate(){ const w=state.words[state.idx]||''; speak(w); }
+    function repeat(){ if(state.mode()==='lcwc'){ enterLook(); } else { dictate(); } }
+    function reveal(){ const w=state.words[state.idx]||''; drawTextCentered(w,{fontSize:32}); }
+    function skip(){ if(state.mode()==='lcwc'){ nextWord(); enterLook(); } else { nextWord(); renderDictation(true); } }
+    function checkAnswer(){ const w=state.words[state.idx]||''; const typedRaw=answer.value||''; const typed=caseSensitive.checked? typedRaw.trim(): typedRaw.trim().toLowerCase(); const target=caseSensitive.checked? w.trim(): w.trim().toLowerCase(); const ok=(typed===target); state.attempts++; if(ok) state.correct++; showAcc(); feedback.innerHTML = ok? '<span class=\"ok\">Верно!</span>' : '<span class=\"bad\">Неверно</span>: <b>'+ (typedRaw||'∅') +'</b> → <b>'+ w +'</b>'; answer.value=''; nextWord(); if(state.mode()==='lcwc'){ enterLook(); } else { renderDictation(true); } }
+    function lookSecs(){ return Math.max(0, Math.min(10, parseFloat(lookSecsInput.value)||2)); }
+
+    // events
+    toListBtn.addEventListener('click', ()=>{ const words=splitWords(raw.value); setWords(words); drawTextCentered('Список готов: '+words.length,{fontSize:18}); });
+    shuffleBtn.addEventListener('click', ()=>{ if(!state.words.length) setWords(splitWords(raw.value)); shuffle(state.words); drawTextCentered('Перемешали порядок',{fontSize:18}); displayCount(); });
+    startBtn.addEventListener('click', ()=>{ if(state.mode()==='dictation') primeTTS(); startQuiz(); });
+    pauseBtn.addEventListener('click', ()=>{ state.elapsed += Date.now()-state.startTs; state.timerOn=false; feedback.textContent='Пауза'; });
+    resumeBtn.addEventListener('click', ()=>{ if(!state.timerOn){ state.timerOn=true; state.startTs=Date.now(); } feedback.textContent='Продолжаем'; answer.focus({preventScroll:false}); });
+    resetTimerBtn.addEventListener('click', resetTimer);
+    repeatBtn.addEventListener('click', repeat); revealBtn.addEventListener('click', reveal); skipBtn.addEventListener('click', skip);
+    checkBtn.addEventListener('click', ()=>checkAnswer());
+    answer.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); checkAnswer(); } });
+
+    // init
+    const last=store.loadLast(); if(last.length){ setWords(last); raw.value=last.join('\\n'); }
+    document.addEventListener('visibilitychange', ()=>{ if(document.hidden && state.timerOn){ state.elapsed += Date.now()-state.startTs; state.timerOn=false; } });
+    lookSecsInput.value=store.loadLookSecs();
+    if('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged=()=>{ voices=window.speechSynthesis.getVoices(); fillVoices(); }; }
+    drawTextCentered('Нажми Start quiz, чтобы начать',{fontSize:18});
+  })();
+  </script>
+</body>
+</html>
