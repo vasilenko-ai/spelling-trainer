@@ -3,20 +3,19 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Спеллинг‑тренажёр — браузер (v2)</title>
+  <title>Спеллинг‑тренажёр — браузер (v5)</title>
   <style>
     :root{--bg:#fbfbfd;--panel:#ffffff;--ink:#15171a;--muted:#6b7280;--accent:#2563eb;--good:#16a34a;--bad:#dc2626;--soft:#eef2ff;--border:#e5e7eb}
     *{box-sizing:border-box}
     body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--ink);background:var(--bg);padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
     header{position:sticky;top:0;background:rgba(251,251,253,.85);backdrop-filter:saturate(150%) blur(8px);border-bottom:1px solid var(--border);z-index:5}
-    .wrap{max-width:1100px;margin:0 auto;padding:14px 18px}
+    .wrap{max-width:1000px;margin:0 auto;padding:14px 18px}
     h1{font-size:20px;margin:0 0 6px;display:flex;align-items:center;gap:10px}
     .badge{font-size:12px;border:1px solid var(--border);border-radius:999px;padding:3px 8px;color:var(--muted);background:#fff}
     .grid{display:grid;gap:14px}
-    @media(min-width:980px){.grid{grid-template-columns:360px 1fr}}
+    @media(min-width:900px){.grid{grid-template-columns:360px 1fr}}
     section.panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px}
     label{font-weight:600}
-    textarea{width:100%;min-height:140px;resize:vertical;border:1px solid var(--border);border-radius:12px;padding:10px}
     input[type="text"], select{width:100%;border:1px solid var(--border);border-radius:10px;padding:12px}
     .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
     .row > *{flex:0 0 auto}
@@ -27,24 +26,30 @@
     .stat{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;background:#fff;border:1px solid var(--border);border-radius:999px;font-size:14px}
     .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:999px;padding:4px 10px;background:#fff}
     .muted{color:var(--muted)}
-    .timer{font-variant-numeric:tabular-nums;font-weight:700}
-    .board{min-height:160px;border:1px dashed var(--border);border-radius:12px;padding:0;display:flex;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden}
-    #cnv{width:100%;height:160px;display:block}
+    .warn{color:#b45309}
     .ok{color:var(--good)} .bad{color:var(--bad)}
-    .kbd{font:12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;background:#f3f4f6;border:1px solid var(--border);padding:2px 6px;border-radius:6px}
+    .timer{font-variant-numeric:tabular-nums;font-weight:700}
+    .board{min-height:180px;border:1px dashed var(--border);border-radius:12px;padding:0;display:flex;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden}
+    #cnv{width:100%;height:180px;display:block}
+    .kbd{font:12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;background:#f3f4f6;border:1px solid var(--border);padding:2px 6px;border-radius:6px}
     details summary{cursor:pointer}
-    .mistakes{max-height:160px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:10px;background:#fff}
+    .mistakes{max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:10px;background:#fff}
     .mistakes li{margin:6px 0}
     .right{display:flex;justify-content:flex-end;gap:8px}
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-    @media(max-width:600px){ input[type="text"]{font-size:18px} .btn{padding:12px 14px} }
     .small{font-size:12px;color:var(--muted)}
+    .picker{display:flex;align-items:center;gap:8px}
+    .picker .btn{padding:10px 12px}
+    .preview{margin-top:8px;border:1px solid var(--border);background:#fff;border-radius:10px;padding:8px;max-height:180px;overflow:auto}
+    .preview .tag{display:inline-block;margin:4px;padding:4px 8px;border:1px solid var(--border);border-radius:999px;background:#f9fafb}
+    #validateBox{margin-top:10px;border:1px solid var(--border);background:#fff;border-radius:10px;padding:10px;display:none}
+    #validateBox ul{margin:6px 0 0 18px}
   </style>
 </head>
 <body>
   <header>
     <div class="wrap">
-      <h1>Спеллинг‑тренажёр — браузер <span class="badge">v2</span></h1>
+      <h1>Спеллинг‑тренажёр — браузер <span class="badge">v5</span></h1>
       <div class="row">
         <div class="stat">⏱️ <span class="muted">Время:</span> <span id="timer" class="timer">00:00</span></div>
         <div class="stat">🎯 <span class="muted">Точность:</span> <span id="acc">—</span></div>
@@ -61,23 +66,33 @@
   <main class="wrap" style="margin-top:12px">
     <div class="grid">
       <section class="panel">
-        <label for="raw">Слова или текст (можно вставить абзац с PDF/сайта)</label>
-        <textarea id="raw" placeholder="Вставь текст или список слов"></textarea>
-        <div class="small">Совет: я автоматически починю переносы по дефису, символы fi/fl‑лигатур и т. п.</div>
-        <div class="row" style="margin-top:8px">
-          <button class="btn" id="toListBtn">Преобразуй в список</button>
-          <button class="btn ghost" id="smartCleanBtn" title="Очистить текст (де‑переносы, лигатуры)">Очистить текст</button>
-          <button class="btn ghost" id="shuffleBtn" title="Перемешать текущий список">Перемешать</button>
+        <div class="picker">
+          <button class="btn" id="prevWeekBtn" title="Предыдущая неделя">«</button>
+          <label class="chip">Неделя:
+            <select id="weekSelect" style="min-width:200px"></select>
+          </label>
+          <button class="btn" id="nextWeekBtn" title="Следующая неделя">»</button>
+          <button class="btn ghost" id="shuffleBtn">Перемешать</button>
           <label class="chip"><input type="checkbox" id="caseSensitive"> Учитывать регистр</label>
+          <button class="btn" id="reloadBtn" title="Перечитать lists.json">Обновить списки</button>
         </div>
+        <div class="small" style="margin-top:6px">
+          Файл берётся из <code>./lists.json</code>. Обнови его в репозитории — и перезагрузи страницу/нажми «Обновить списки».
+        </div>
+
+        <div class="preview" id="weekPreview" aria-live="polite"></div>
+
+        <div id="validateBox">
+          <div id="validateSummary" class="muted"></div>
+          <div id="validateDetails"></div>
+        </div>
+
         <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
         <div class="row">
           <label>Режим:</label>
           <label class="chip"><input type="radio" name="mode" value="lcwc" checked> Look → Cover → Write → Check</label>
           <label class="chip"><input type="radio" name="mode" value="dictation"> Диктовка</label>
-        </div>
-        <div class="row" id="lookRow" style="margin-top:6px">
-          <label class="chip"><span class="muted">Показ слова</span>
+          <label class="chip"><span class="muted">Показ</span>
             <input type="number" id="lookSecs" min="0" max="10" step="0.5" value="2" style="width:90px"> сек
           </label>
         </div>
@@ -94,25 +109,10 @@
           <button class="btn" id="workMistakesBtn" disabled>Работа над ошибками</button>
           <button class="btn" id="clearErrorsBtn" disabled>Очистить ошибки</button>
         </div>
-
-        <details style="margin-top:10px">
-          <summary>💾 Списки: Save / Load / Share</summary>
-          <div class="row" style="margin-top:8px">
-            <input type="text" id="listName" placeholder="Название списка" style="min-width:200px">
-            <button class="btn" id="saveListBtn">Сохранить локально</button>
-            <select id="savedLists" style="min-width:200px"></select>
-            <button class="btn" id="loadListBtn">Загрузить</button>
-            <button class="btn" id="deleteListBtn" title="Удалить выбранный список">Удалить</button>
-          </div>
-          <div class="row" style="margin-top:8px">
-            <button class="btn" id="shareLinkBtn" title="Создать ссылку с этим списком">Поделиться ссылкой</button>
-            <input type="text" id="shareLinkOut" readonly style="min-width:380px" placeholder="ссылка появится здесь">
-          </div>
-        </details>
       </section>
 
       <section class="panel">
-        <div class="board"><canvas id="cnv" width="1000" height="160"></canvas></div>
+        <div class="board"><canvas id="cnv" width="1000" height="180"></canvas></div>
         <div id="answerRow" class="row" style="margin-top:12px;display:none">
           <input type="text" id="answer" placeholder="Введите слово и нажмите Enter"
                  autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
@@ -132,7 +132,7 @@
     <section class="panel" style="margin-top:14px">
       <strong>Подсказки:</strong>
       <div class="muted" style="margin-top:6px">
-        <span class="kbd">Enter</span> — Check / далее • <span class="kbd">R</span> — Repeat • <span class="kbd">S</span> — Skip • <span class="kbd">V</span> — Reveal • <span class="kbd">Space</span> — Пауза/Продолжить
+        <span class="kbd">Enter</span> — Check / далее • <span class="kbd">R</span> — Repeat • <span class="kbd">S</span> — Skip • <span class="kbd">V</span> — Reveal • <span class="kbd">← / →</span> — неделя −/+ • <span class="kbd">Space</span> — Пауза/Продолжить
       </div>
     </section>
   </main>
@@ -140,58 +140,153 @@
   <script>
   (function(){
     const $ = (s)=>document.querySelector(s);
-    const raw=$('#raw'), toListBtn=$('#toListBtn'), smartCleanBtn=$('#smartCleanBtn'), shuffleBtn=$('#shuffleBtn');
+    // Elements
+    const weekSelect=$('#weekSelect'), prevWeekBtn=$('#prevWeekBtn'), nextWeekBtn=$('#nextWeekBtn');
+    const weekPreview=$('#weekPreview');
+    const validateBox=$('#validateBox'), validateSummary=$('#validateSummary'), validateDetails=$('#validateDetails');
+    const shuffleBtn=$('#shuffleBtn'), reloadBtn=$('#reloadBtn');
     const countEl=$('#count'), accEl=$('#acc'), timerEl=$('#timer');
     const startBtn=$('#startBtn'), pauseBtn=$('#pauseBtn'), resumeBtn=$('#resumeBtn'), resetTimerBtn=$('#resetTimerBtn');
     const modeRadios=document.querySelectorAll('input[name="mode"]'); const caseSensitive=$('#caseSensitive');
-    const lookRow=$('#lookRow'), lookSecsInput=$('#lookSecs');
+    const lookSecsInput=$('#lookSecs');
     const voiceRow=$('#voiceRow'), voiceSelect=$('#voiceSelect'), rate=$('#rate'), ttsWarn=$('#ttsWarn');
-
     const cnv=$('#cnv'), ctx=cnv.getContext('2d'); const dpr=window.devicePixelRatio||1;
     const answerRow=$('#answerRow'), answer=$('#answer'), checkBtn=$('#checkBtn');
     const repeatBtn=$('#repeatBtn'), revealBtn=$('#revealBtn'), skipBtn=$('#skipBtn'), progress=$('#progress'), feedback=$('#feedback');
     const mistakesList=$('#mistakes'), errorsOnlyBtn=$('#errorsOnlyBtn'), workMistakesBtn=$('#workMistakesBtn'), clearErrorsBtn=$('#clearErrorsBtn');
-    const listName=$('#listName'), saveListBtn=$('#saveListBtn'), savedLists=$('#savedLists'), loadListBtn=$('#loadListBtn'), deleteListBtn=$('#deleteListBtn');
-    const shareLinkBtn=$('#shareLinkBtn'), shareLinkOut=$('#shareLinkOut');
+
+    const LISTS_URL='./lists.json';
 
     const store={
-      saveLast:(w)=>localStorage.setItem('sptr:last', JSON.stringify(w)),
-      loadLast:()=>{try{return JSON.parse(localStorage.getItem('sptr:last')||'[]')}catch(e){return []}},
-      saveNamed:(n,w)=>{const a=store._all(); a[n]=w; localStorage.setItem('sptr:named', JSON.stringify(a));},
-      loadNamed:(n)=>store._all()[n]||[],
-      removeNamed:(n)=>{const a=store._all(); delete a[n]; localStorage.setItem('sptr:named', JSON.stringify(a));},
-      names:()=>Object.keys(store._all()).sort(),
-      _all:()=>{try{return JSON.parse(localStorage.getItem('sptr:named')||'{}')}catch(e){return {}}},
       saveLookSecs:(v)=>localStorage.setItem('sptr:lookSecs', String(v)),
-      loadLookSecs:()=>{const v=parseFloat(localStorage.getItem('sptr:lookSecs')); return isFinite(v)?v:2;}
+      loadLookSecs:()=>{const v=parseFloat(localStorage.getItem('sptr:lookSecs')); return isFinite(v)?v:2;},
+      saveMistakes:(m)=>localStorage.setItem('sptr:misc:m', JSON.stringify(m||[])),
+      loadMistakes:()=>{try{return JSON.parse(localStorage.getItem('sptr:misc:m')||'[]')}catch(e){return []}},
+      saveWeekIdx:(i)=>localStorage.setItem('sptr:weekIdx', String(i)),
+      loadWeekIdx:()=>{const v=parseInt(localStorage.getItem('sptr:weekIdx')); return isFinite(v)?v:0;},
     };
 
-    const state={ words:[], idx:0, attempts:0, correct:0, running:false,
+    const state={ weeks:[], words:[], idx:0, attempts:0, correct:0, running:false,
       timerOn:false,startTs:0, elapsed:0, mode:()=>document.querySelector('input[name="mode"]:checked').value,
       phase:'idle', mistakes:[], lookTimer:null, ttsPrimed:false };
 
-    // ---- CLEANERS ----
-    const ligMap = {'\ufb00':'ff','\ufb01':'fi','\ufb02':'fl','\ufb03':'ffi','\ufb04':'ffl'}; // ff, fi, fl, ffi, ffl
-    function cleanText(text){
-      return text
-        .replace(/[\u00AD\u200B\u200C\u200D\u2060]/g,'')               // soft hyphen & zero-width
-        .replace(/([A-Za-z])-\s*\n\s*([A-Za-z])/g, '$1$2')            // dehyphenate across line break
-        .replace(/[\ufb00-\ufb04]/g, ch=>ligMap[ch]||ch)              // normalize ligatures
-        .replace(/\r/g,'\n');
+    // Fetch lists
+    async function loadLists(cacheBust=false){
+      try{
+        const url = cacheBust ? (LISTS_URL + '?v=' + Date.now()) : LISTS_URL;
+        const resp = await fetch(url, {cache:'no-store'});
+        if(!resp.ok) throw new Error('HTTP '+resp.status);
+        const data = await resp.json();
+        if(!data || !Array.isArray(data.weeks)) throw new Error('Wrong format');
+        state.weeks = data.weeks;
+        populateWeeks();
+      }catch(e){
+        drawTextCentered('Не удалось загрузить lists.json',{fontSize:18});
+        feedback.innerHTML = '<span class="warn">Ошибка загрузки списков: '+ e.message +'</span>';
+      }
     }
-    function extractWords(text){
-      text = cleanText(text);
-      const out=[]; const re=/[A-Za-z]+(?:'[A-Za-z]+)?/g; let m;
-      while((m=re.exec(text))){ out.push(m[0]); }
-      return out;
+    function populateWeeks(){
+      weekSelect.innerHTML='';
+      state.weeks.forEach((w,i)=>{
+        const opt=document.createElement('option');
+        opt.value=String(i); opt.textContent=(w.name||('Week '+(i+1)))+' — '+(w.words?.length||0);
+        weekSelect.appendChild(opt);
+      });
+      const idx = store.loadWeekIdx();
+      weekSelect.value = String(Math.max(0, Math.min(idx, state.weeks.length-1)));
+      applyWeek();
+    }
+    function applyWeek(){
+      const idx = parseInt(weekSelect.value)||0;
+      store.saveWeekIdx(idx);
+      const w = state.weeks[idx] || {name:'Week', words:[]};
+      setWords(w.words||[]);
+      drawTextCentered('Выбрано: '+ (w.name||('Week '+(idx+1))) +' — '+ state.words.length +' слов',{fontSize:18});
+      renderPreview();
+      runValidation(false); // show validation state, но не блокируем UX до старта
     }
 
-    // ---- UI helpers ----
-    function displayCount(){ countEl.textContent=String(state.words.length); progress.textContent=String(Math.min(state.idx+1,state.words.length))+' / '+String(state.words.length); }
-    function accuracy(){ return state.attempts? Math.round(100*state.correct/state.attempts): null; }
-    function showAcc(){ const a=accuracy(); accEl.textContent=(a==null? '—' : (state.correct+' / '+state.attempts+' ('+a+'%)')); }
+    // Week navigation
+    function changeWeek(delta){
+      let idx = parseInt(weekSelect.value)||0;
+      idx = idx + delta;
+      if(idx<0) idx = state.weeks.length-1;
+      if(idx>=state.weeks.length) idx = 0;
+      weekSelect.value = String(idx);
+      applyWeek();
+    }
+    prevWeekBtn.addEventListener('click', ()=>changeWeek(-1));
+    nextWeekBtn.addEventListener('click', ()=>changeWeek(1));
+    document.addEventListener('keydown', (e)=>{
+      const tag=(document.activeElement && document.activeElement.tagName) || '';
+      if(['INPUT','TEXTAREA','SELECT'].includes(tag)) return;
+      if(e.key==='ArrowLeft') changeWeek(-1);
+      if(e.key==='ArrowRight') changeWeek(1);
+    });
+    weekSelect.addEventListener('change', applyWeek);
 
-    // timer
+    // Preview
+    function renderPreview(){
+      weekPreview.innerHTML = state.words.length
+        ? state.words.map(w=>'<span class="tag">'+escapeHtml(w)+'</span>').join('')
+        : '<span class="muted">В этой неделе пока нет слов</span>';
+    }
+    function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+    // Validation
+    const reWord = /^[A-Za-z]+(?:['’\-][A-Za-z]+)*$/; // буквы + апостроф/дефис внутри
+    const MAXLEN = 32;
+    function normalizeKey(w){ return (w||'').toLowerCase().replace(/[’]/g,"'"); }
+    function validateWords(words){
+      const issues = { invalid:[], tooLong:[], duplicates:[] };
+      const seen = new Map();
+      words.forEach((w,i)=>{
+        if(typeof w!=='string' || !w.trim()){ issues.invalid.push({w, i, reason:'пусто/не строка'}); return; }
+        const ww = w.trim();
+        if(ww.length>MAXLEN){ issues.tooLong.push({w:ww, i}); }
+        if(!reWord.test(ww)){ issues.invalid.push({w:ww, i, reason:'недопустимые символы'}); }
+        const key = normalizeKey(ww);
+        if(seen.has(key)){ issues.duplicates.push({w:ww, first:seen.get(key), i}); } else { seen.set(key, i); }
+      });
+      const ok = !issues.invalid.length && !issues.tooLong.length && !issues.duplicates.length;
+      return { ok, issues };
+    }
+    function runValidation(blockOnFail){
+      const {ok, issues} = validateWords(state.words);
+      if(ok){
+        validateBox.style.display='none';
+        startBtn.disabled=false;
+        return true;
+      } else {
+        const parts = [];
+        if(issues.invalid.length) parts.push('некорректных: '+issues.invalid.length);
+        if(issues.tooLong.length) parts.push('слишком длинных: '+issues.tooLong.length);
+        if(issues.duplicates.length) parts.push('дубликатов: '+issues.duplicates.length);
+        validateSummary.innerHTML = '<span class="bad">Проверь список</span> — ' + parts.join(', ');
+        let html='';
+        if(issues.invalid.length){
+          html += '<div class="warn"><b>Некорректные слова</b><ul>'+ issues.invalid.slice(0,20).map(x=>'<li>['+(x.i+1)+'] '+escapeHtml(x.w)+' <span class="muted">('+x.reason+')</span></li>').join('') + (issues.invalid.length>20? '<li>…</li>':'' ) +'</ul></div>';
+        }
+        if(issues.tooLong.length){
+          html += '<div class="warn"><b>Слишком длинные (&gt;'+MAXLEN+')</b><ul>'+ issues.tooLong.slice(0,20).map(x=>'<li>['+(x.i+1)+'] '+escapeHtml(x.w)+'</li>').join('') + (issues.tooLong.length>20? '<li>…</li>':'' ) +'</ul></div>';
+        }
+        if(issues.duplicates.length){
+          html += '<div class="warn"><b>Дубликаты (без учёта регистра/апострофа)</b><ul>'+ issues.duplicates.slice(0,20).map(x=>'<li>['+(x.i+1)+'] '+escapeHtml(x.w)+' <span class="muted">(первое в позиции '+(x.first+1)+')</span></li>').join('') + (issues.duplicates.length>20? '<li>…</li>':'' ) +'</ul></div>';
+        }
+        validateDetails.innerHTML = html;
+        validateBox.style.display='block';
+        if(blockOnFail){
+          validateBox.scrollIntoView({behavior:'smooth', block:'center'});
+          startBtn.disabled=true;
+          return false;
+        } else {
+          startBtn.disabled=false; // позволяем запустить, но при старте проверим жёстко
+          return false;
+        }
+      }
+    }
+
+    // Timer
     let tickId=null;
     function startTimer(){ if(state.timerOn) return; state.timerOn=true; state.startTs=Date.now(); tickId=setInterval(updateTimer,250); toggleTimerBtns(); }
     function pauseTimer(){ if(!state.timerOn) return; state.elapsed += Date.now()-state.startTs; state.timerOn=false; clearInterval(tickId); tickId=null; toggleTimerBtns(); }
@@ -199,13 +294,13 @@
     function updateTimer(){ const ms=state.timerOn? state.elapsed+(Date.now()-state.startTs): state.elapsed; const sec=Math.floor(ms/1000); const m=('0'+Math.floor(sec/60)).slice(-2); const s=('0'+(sec%60)).slice(-2); timerEl.textContent=m+':'+s; }
     function toggleTimerBtns(){ resetTimerBtn.disabled=(state.elapsed===0 && !state.timerOn); pauseBtn.disabled=!state.timerOn; resumeBtn.disabled=state.timerOn || (!state.running && state.elapsed===0); }
 
-    // canvas
+    // Canvas
     function resizeCanvas(){ const r=cnv.getBoundingClientRect(); const w=Math.max(1,Math.floor(r.width*dpr)); const h=Math.max(1,Math.floor(r.height*dpr)); if(cnv.width!==w||cnv.height!==h){ cnv.width=w; cnv.height=h; } ctx.setTransform(1,0,0,1,0,0); ctx.scale(dpr,dpr); }
     function clearCanvas(){ ctx.clearRect(0,0,cnv.width,cnv.height); }
     function drawTextCentered(text, opts){ opts=opts||{}; resizeCanvas(); clearCanvas(); const r=cnv.getBoundingClientRect(); let w=r.width, h=r.height; let fontSize=opts.fontSize||32; const fam=opts.fontFamily||'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial'; ctx.fillStyle=opts.color||'#15171a'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='600 '+fontSize+'px '+fam; while(ctx.measureText(text).width>w*0.9 && fontSize>14){ fontSize -= 2; ctx.font='600 '+fontSize+'px '+fam; } ctx.fillText(text, w/2, h/2); }
     const maskWord=(w)=> w.replace(/\S/g,'•');
 
-    // TTS (dictation)
+    // TTS
     let voices=[]; const hasTTS=('speechSynthesis' in window);
     function fillVoices(){ if(!hasTTS) return; voiceSelect.innerHTML=''; const list=voices.length? voices : window.speechSynthesis.getVoices(); const preferred=list.filter(v=>/^en(-|$)/i.test(v.lang)); const src=preferred.length? preferred : list; src.forEach(v=>{ const o=document.createElement('option'); o.value=v.name; o.textContent=v.name+' — '+v.lang; voiceSelect.appendChild(o); }); }
     function ensureVoicesReady(timeout){ timeout=timeout||2000; return new Promise(res=>{ if(!hasTTS) return res(false); const start=Date.now(); (function wait(){ voices=window.speechSynthesis.getVoices(); if(voices.length || Date.now()-start>timeout){ fillVoices(); res(voices.length>0); } else { setTimeout(wait,100); } })(); }); }
@@ -213,10 +308,20 @@
     function speak(text){ if(!hasTTS){ feedback.textContent='Режим диктовки недоступен (нет TTS)'; return; } window.speechSynthesis.cancel(); try{ window.speechSynthesis.resume(); }catch(e){} const u=new SpeechSynthesisUtterance(text); const v=voices[0] || window.speechSynthesis.getVoices()[0]; if(v){ u.voice=v; u.lang=v.lang; } u.rate=parseFloat(rate?.value||'1'); window.speechSynthesis.speak(u); }
     if(hasTTS){ window.speechSynthesis.onvoiceschanged=()=>{ voices=window.speechSynthesis.getVoices(); fillVoices(); }; } else { ttsWarn.style.display='inline'; }
 
-    // core
-    function setWords(words){ state.words=words.slice(); state.idx=0; displayCount(); store.saveLast(state.words); }
-    function ensureWords(){ if(state.words.length) return true; const candidate=extractWords(raw.value); if(candidate.length){ setWords(candidate); return true; } drawTextCentered('Добавь слова и нажми «Преобразуй в список»',{fontSize:18}); return false; }
-    function startQuiz(){ const ui=extractWords(raw.value); if(ui.length){ setWords(ui); } else if(!ensureWords()) return; state.running=true; state.attempts=0; state.correct=0; state.mistakes=[]; showAcc(); mistakesList.innerHTML=''; displayCount(); state.idx=0; answer.value=''; if(state.mode()==='lcwc'){ enterLook(); } else { dictationStart(); } startTimer(); enableRunBtns(true); }
+    // Flow
+    function setWords(words){ state.words = words.slice(); state.idx=0; displayCount(); }
+    function displayCount(){ countEl.textContent=String(state.words.length); progress.textContent=String(Math.min(state.idx+1,state.words.length))+' / '+String(state.words.length); }
+    function accuracy(){ return state.attempts? Math.round(100*state.correct/state.attempts): null; }
+    function showAcc(){ const a=accuracy(); accEl.textContent=(a==null? '—' : (state.correct+' / '+state.attempts+' ('+a+'%)')); }
+
+    function startQuiz(){
+      // Validate before start
+      if(!runValidation(true)) return;
+      if(!state.words.length){ drawTextCentered('В этой неделе нет слов',{fontSize:18}); return; }
+      state.running=true; state.attempts=0; state.correct=0; showAcc(); displayCount(); state.idx=0; answer.value='';
+      if(state.mode()==='lcwc'){ enterLook(); } else { dictationStart(); }
+      startTimer(); enableRunBtns(true);
+    }
     function enableRunBtns(e){ [repeatBtn,revealBtn,skipBtn,checkBtn].forEach(b=>b.disabled=!e); pauseBtn.disabled=!e || !state.timerOn; resetTimerBtn.disabled=!e && state.elapsed===0; answerRow.style.display=e? 'flex':'none'; }
     function nextWord(){ state.idx=(state.idx+1)%Math.max(1,state.words.length); displayCount(); }
     function clearLookTimer(){ if(state.lookTimer){ clearTimeout(state.lookTimer); state.lookTimer=null; } }
@@ -228,35 +333,35 @@
     function repeat(){ if(state.mode()==='lcwc'){ enterLook(); } else { dictate(); } }
     function reveal(){ const w=state.words[state.idx]||''; drawTextCentered(w,{fontSize:32}); }
     function skip(){ if(state.mode()==='lcwc'){ nextWord(); enterLook(); } else { nextWord(); renderDictation(true); } }
-    function checkAnswer(){ const w=state.words[state.idx]||''; const typedRaw=answer.value||''; const typed=caseSensitive.checked? typedRaw.trim(): typedRaw.trim().toLowerCase(); const target=caseSensitive.checked? w.trim(): w.trim().toLowerCase(); const ok=(typed===target); state.attempts++; if(ok) state.correct++; showAcc(); feedback.innerHTML = ok? '<span class="ok">Верно!</span>' : '<span class="bad">Неверно</span>: <b>'+ (typedRaw||'∅') +'</b> → <b>'+ w +'</b>'; if(!ok){ state.mistakes.push({word:w, typed:typedRaw}); appendMistake(w, typedRaw); errorsOnlyBtn.disabled=false; workMistakesBtn.disabled=false; clearErrorsBtn.disabled=false; } answer.value=''; nextWord(); if(state.mode()==='lcwc'){ enterLook(); } else { renderDictation(true); } }
-    function lookSecs(){ return Math.max(0, Math.min(10, parseFloat(lookSecsInput.value)||2)); }
+    function checkAnswer(){
+      const w=state.words[state.idx]||''; const typedRaw=answer.value||'';
+      const typed=caseSensitive.checked? typedRaw.trim(): typedRaw.trim().toLowerCase();
+      const target=caseSensitive.checked? w.trim(): w.trim().toLowerCase();
+      const ok=(typed===target); state.attempts++; if(ok) state.correct++; showAcc();
+      if(!ok){ addMistake({word:w, typed:typedRaw}); }
+      feedback.innerHTML = ok? '<span class="ok">Верно!</span>' : '<span class="bad">Неверно</span>: <b>'+ (typedRaw||'∅') +'</b> → <b>'+ w +'</b>';
+      answer.value=''; nextWord(); if(state.mode()==='lcwc'){ enterLook(); } else { renderDictation(true); }
+    }
 
-    function appendMistake(word, typed){ const li=document.createElement('li'); li.textContent='• '+word+' — вы ввели: '+(typed||'∅'); mistakesList.appendChild(li); }
+    // Mistakes persistent
+    function addMistake(m){ state.mistakes.push(m); store.saveMistakes(state.mistakes); const li=document.createElement('li'); li.textContent='• '+m.word+' — вы ввели: '+(m.typed||'∅'); mistakesList.appendChild(li); errorsOnlyBtn.disabled=false; workMistakesBtn.disabled=false; clearErrorsBtn.disabled=false; }
+    function loadMistakesUI(){ mistakesList.innerHTML=''; state.mistakes.forEach(m=>{ const li=document.createElement('li'); li.textContent='• '+m.word+' — вы ввели: '+(m.typed||'∅'); mistakesList.appendChild(li); }); const has=state.mistakes.length>0; errorsOnlyBtn.disabled=!has; workMistakesBtn.disabled=!has; clearErrorsBtn.disabled=!has; }
+    function errorsOnly(){ if(!state.mistakes.length){ drawTextCentered('Ошибок нет',{fontSize:18}); return; } const uniq=[...new Set(state.mistakes.map(m=>m.word))]; setWords(uniq); feedback.textContent='Режим: работа над ошибками'; if(state.mode()==='lcwc'){ enterLook(); } else { renderDictation(true); } }
+    function clearErrors(){ state.mistakes=[]; store.saveMistakes([]); loadMistakesUI(); }
 
-    // Errors Only / Работа над ошибками
-    function errorsOnly(){ if(!state.mistakes.length) return; const uniq=[...new Set(state.mistakes.map(m=>m.word))]; if(!uniq.length){ drawTextCentered('Ошибок нет',{fontSize:18}); return; } setWords(uniq); feedback.textContent='Повторяем только ошибки'; if(state.mode()==='lcwc'){ enterLook(); } else { renderDictation(true); } errorsOnlyBtn.disabled=true; workMistakesBtn.disabled=true; }
-    function clearErrors(){ state.mistakes=[]; mistakesList.innerHTML=''; errorsOnlyBtn.disabled=true; workMistakesBtn.disabled=true; clearErrorsBtn.disabled=true; }
+    // Shuffle
+    function shuffleInPlace(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } }
+    shuffleBtn.addEventListener('click', ()=>{ shuffleInPlace(state.words); drawTextCentered('Перемешали порядок',{fontSize:18}); displayCount(); renderPreview(); runValidation(false); });
 
-    // Smart Clean
-    function smartClean(){ const cleaned = cleanText(raw.value); raw.value = cleaned; alert('Текст очищен: переноси по дефису и лигатуры исправлены. Теперь нажми «Преобразуй в список».'); }
-
-    // Share link (no server): encode list into URL hash
-    function encodeShare(words, name){ const payload = JSON.stringify({name, words, ts:Date.now()}); const b64 = btoa(unescape(encodeURIComponent(payload))); return location.origin + location.pathname + '#list=' + b64; }
-    function decodeShare(){ const m = location.hash.match(/#list=([A-Za-z0-9+/=]+)/); if(!m) return null; try{ const json = decodeURIComponent(escape(atob(m[1]))); return JSON.parse(json); }catch(e){ return null; } }
-
-    function refreshSaved(){ const names=store.names(); savedLists.innerHTML=names.map(n=>'<option value="'+n+'">'+n+'</option>').join(''); }
-
-    // events
-    toListBtn.addEventListener('click', ()=>{ const words=extractWords(raw.value); setWords(words); drawTextCentered('Список готов: '+words.length,{fontSize:18}); });
-    smartCleanBtn.addEventListener('click', smartClean);
-    shuffleBtn.addEventListener('click', ()=>{ if(!state.words.length) setWords(extractWords(raw.value)); for(let i=state.words.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [state.words[i],state.words[j]]=[state.words[j],state.words[i]]; } drawTextCentered('Перемешали порядок',{fontSize:18}); displayCount(); });
-
+    // Events
     startBtn.addEventListener('click', ()=>{ if(state.mode()==='dictation') primeTTS(); startQuiz(); });
     pauseBtn.addEventListener('click', ()=>{ pauseTimer(); feedback.textContent='Пауза'; });
     resumeBtn.addEventListener('click', ()=>{ startTimer(); feedback.textContent='Продолжаем'; answer.focus({preventScroll:false}); });
     resetTimerBtn.addEventListener('click', resetTimer);
 
-    repeatBtn.addEventListener('click', repeat); revealBtn.addEventListener('click', reveal); skipBtn.addEventListener('click', skip);
+    repeatBtn.addEventListener('click', repeat);
+    revealBtn.addEventListener('click', reveal);
+    skipBtn.addEventListener('click', skip);
     checkBtn.addEventListener('click', ()=>checkAnswer());
     answer.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); checkAnswer(); } });
 
@@ -264,20 +369,29 @@
     workMistakesBtn.addEventListener('click', errorsOnly);
     clearErrorsBtn.addEventListener('click', clearErrors);
 
-    saveListBtn.addEventListener('click', ()=>{ const name=(listName.value||'').trim(); if(!name){ alert('Название списка'); return; } const words=state.words.length? state.words : extractWords(raw.value); if(!words.length){ alert('Нет слов для сохранения'); return; } const all=store._all(); all[name]=words; localStorage.setItem('sptr:named', JSON.stringify(all)); refreshSaved(); savedLists.value=name; alert('Сохранено локально ✔'); });
-    loadListBtn.addEventListener('click', ()=>{ const name=savedLists.value; if(!name){ alert('Нет сохранённых списков'); return;} const w=store.loadNamed(name); setWords(w); raw.value=w.join('\\n'); drawTextCentered('Загружен список «'+name+'» ('+w.length+')',{fontSize:18}); });
-    deleteListBtn.addEventListener('click', ()=>{ const name=savedLists.value; if(!name) return; if(confirm('Удалить список «'+name+'»?')){ store.removeNamed(name); refreshSaved(); drawTextCentered('Список удалён',{fontSize:18}); } });
+    modeRadios.forEach(r=>r.addEventListener('change', ()=>{
+      const isDict=(state.mode()==='dictation');
+      voiceRow.style.display=isDict? 'flex':'none';
+      if(state.running){ feedback.textContent='Режим переключён'; if(isDict){ dictationStart(); } else { enterLook(); } }
+    }));
 
-    shareLinkBtn.addEventListener('click', ()=>{ const name=(listName.value||'').trim() || 'list'; const words=state.words.length? state.words : extractWords(raw.value); if(!words.length){ alert('Нет слов для ссылки'); return; } const url=encodeShare(words, name); shareLinkOut.value=url; shareLinkOut.select(); try{ document.execCommand('copy'); }catch(e){} });
+    lookSecsInput.addEventListener('change', ()=>{ const v=Math.max(0, Math.min(10, parseFloat(lookSecsInput.value)||0)); lookSecsInput.value=v; store.saveLookSecs(v); });
+    function lookSecs(){ return Math.max(0, Math.min(10, parseFloat(lookSecsInput.value)||2)); }
 
-    // canvas helpers
-    function drawTextCentered(text, opts){ opts=opts||{}; resizeCanvas(); clearCanvas(); const r=cnv.getBoundingClientRect(); let w=r.width; let fontSize=opts.fontSize||32; const fam=opts.fontFamily||'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial'; ctx.fillStyle=opts.color||'#15171a'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='600 '+fontSize+'px '+fam; while(ctx.measureText(text).width>w*0.9 && fontSize>14){ fontSize -= 2; ctx.font='600 '+fontSize+'px '+fam; } ctx.fillText(text, w/2, cnv.getBoundingClientRect().height/2); }
-
-    // init
-    function initFromHash(){ const payload=decodeShare(); if(payload && Array.isArray(payload.words)){ setWords(payload.words); raw.value = payload.words.join('\\n'); if(payload.name) listName.value=payload.name; drawTextCentered('Загружен общий список «'+(payload.name||'list')+'» ('+payload.words.length+')',{fontSize:18}); } }
-    function init(){ const last=store.loadLast(); if(last.length){ setWords(last); raw.value=last.join('\\n'); } refreshSaved(); lookSecsInput.value=store.loadLookSecs(); drawTextCentered('Нажми Start quiz, чтобы начать',{fontSize:18}); initFromHash(); }
-    window.addEventListener('hashchange', initFromHash);
+    // Init
+    function init(){
+      lookSecsInput.value = store.loadLookSecs();
+      state.mistakes = store.loadMistakes();
+      loadMistakesUI();
+      drawTextCentered('Загружаем списки…',{fontSize:18});
+      loadLists();
+    }
     init();
+
+    // Utils
+    function drawTextCentered(text, opts){ opts=opts||{}; resizeCanvas(); clearCanvas(); const r=cnv.getBoundingClientRect(); let w=r.width, h=r.height; let fontSize=opts.fontSize||32; const fam=opts.fontFamily||'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial'; ctx.fillStyle=opts.color||'#15171a'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='600 '+fontSize+'px '+fam; while(ctx.measureText(text).width>w*0.9 && fontSize>14){ fontSize -= 2; ctx.font='600 '+fontSize+'px '+fam; } ctx.fillText(text, w/2, h/2); }
+    function resizeCanvas(){ const r=cnv.getBoundingClientRect(); const w=Math.max(1,Math.floor(r.width*dpr)); const h=Math.max(1,Math.floor(r.height*dpr)); if(cnv.width!==w||cnv.height!==h){ cnv.width=w; cnv.height=h; } ctx.setTransform(1,0,0,1,0,0); ctx.scale(dpr,dpr); }
+    function clearCanvas(){ ctx.clearRect(0,0,cnv.width,cnv.height); }
   })();
   </script>
 </body>
