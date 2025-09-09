@@ -3,25 +3,27 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Спеллинг‑тренажёр — браузер (v5)</title>
+  <title>Спеллинг‑тренажёр — браузер (v6)</title>
   <style>
     :root{--bg:#fbfbfd;--panel:#ffffff;--ink:#15171a;--muted:#6b7280;--accent:#2563eb;--good:#16a34a;--bad:#dc2626;--soft:#eef2ff;--border:#e5e7eb}
     *{box-sizing:border-box}
-    body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--ink);background:var(--bg);padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+    body{margin:0;font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--ink);background:#fbfbfd;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
     header{position:sticky;top:0;background:rgba(251,251,253,.85);backdrop-filter:saturate(150%) blur(8px);border-bottom:1px solid var(--border);z-index:5}
     .wrap{max-width:1000px;margin:0 auto;padding:14px 18px}
     h1{font-size:20px;margin:0 0 6px;display:flex;align-items:center;gap:10px}
     .badge{font-size:12px;border:1px solid var(--border);border-radius:999px;padding:3px 8px;color:var(--muted);background:#fff}
     .grid{display:grid;gap:14px}
     @media(min-width:900px){.grid{grid-template-columns:360px 1fr}}
-    section.panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px}
+    section.panel{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px}
     label{font-weight:600}
     input[type="text"], select{width:100%;border:1px solid var(--border);border-radius:10px;padding:12px}
     .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    .row > *{flex:0 0 auto}
-    .btn{appearance:none;border:1px solid var(--border);background:#fff;border-radius:10px;padding:10px 12px;cursor:pointer}
+    .btn{appearance:none;border:1px solid var(--border);background:#fff;border-radius:10px;padding:10px 12px;cursor:pointer;transition:transform .05s ease}
+    .btn:active{transform:translateY(1px)}
     .btn:disabled{opacity:.5;cursor:not-allowed}
     .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+    .btn.big{font-size:18px;padding:14px 18px}
+    .btn.block{width:100%}
     .btn.ghost{background:var(--soft)}
     .stat{display:inline-flex;gap:6px;align-items:center;padding:6px 10px;background:#fff;border:1px solid var(--border);border-radius:999px;font-size:14px}
     .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:999px;padding:4px 10px;background:#fff}
@@ -31,8 +33,9 @@
     .timer{font-variant-numeric:tabular-nums;font-weight:700}
     .board{min-height:180px;border:1px dashed var(--border);border-radius:12px;padding:0;display:flex;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden}
     #cnv{width:100%;height:180px;display:block}
-    .kbd{font:12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;background:#f3f4f6;border:1px solid var(--border);padding:2px 6px;border-radius:6px}
-    details summary{cursor:pointer}
+    .kbd{font:12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;background:#f3f4f6;border:1px solid var(--border);padding:2px 6px;border-radius:6px}
+    details summary{cursor:pointer;user-select:none;list-style:none}
+    details summary::-webkit-details-marker{display:none}
     .mistakes{max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:10px;padding:10px;background:#fff}
     .mistakes li{margin:6px 0}
     .right{display:flex;justify-content:flex-end;gap:8px}
@@ -44,20 +47,22 @@
     .preview .tag{display:inline-block;margin:4px;padding:4px 8px;border:1px solid var(--border);border-radius:999px;background:#f9fafb}
     #validateBox{margin-top:10px;border:1px solid var(--border);background:#fff;border-radius:10px;padding:10px;display:none}
     #validateBox ul{margin:6px 0 0 18px}
+    .summaryLine{display:flex;align-items:center;gap:8px}
+    .summaryLine .count{color:var(--muted);font-size:12px}
   </style>
 </head>
 <body>
   <header>
     <div class="wrap">
-      <h1>Спеллинг‑тренажёр — браузер <span class="badge">v5</span></h1>
+      <h1>Спеллинг‑тренажёр — браузер <span class="badge">v6</span></h1>
       <div class="row">
         <div class="stat">⏱️ <span class="muted">Время:</span> <span id="timer" class="timer">00:00</span></div>
         <div class="stat">🎯 <span class="muted">Точность:</span> <span id="acc">—</span></div>
         <div class="stat">🧩 <span class="muted">Слов:</span> <span id="count">0</span></div>
         <div class="right" style="margin-left:auto">
-          <button class="btn" id="pauseBtn" disabled>Пауза</button>
-          <button class="btn" id="resumeBtn" disabled>Продолжить</button>
-          <button class="btn" id="resetTimerBtn" disabled>Сброс таймера</button>
+          <button class="btn" id="pauseBtn" disabled>⏸️ Пауза</button>
+          <button class="btn" id="resumeBtn" disabled>▶️ Продолжить</button>
+          <button class="btn" id="resetTimerBtn" disabled>🔄 Сброс таймера</button>
         </div>
       </div>
     </div>
@@ -72,15 +77,16 @@
             <select id="weekSelect" style="min-width:200px"></select>
           </label>
           <button class="btn" id="nextWeekBtn" title="Следующая неделя">»</button>
-          <button class="btn ghost" id="shuffleBtn">Перемешать</button>
+          <button class="btn ghost" id="shuffleBtn">🔀 Перемешать</button>
           <label class="chip"><input type="checkbox" id="caseSensitive"> Учитывать регистр</label>
-          <button class="btn" id="reloadBtn" title="Перечитать lists.json">Обновить списки</button>
-        </div>
-        <div class="small" style="margin-top:6px">
-          Файл берётся из <code>./lists.json</code>. Обнови его в репозитории — и перезагрузи страницу/нажми «Обновить списки».
+          <label class="chip"><input type="checkbox" id="speakOnType"> 🔤 Произносить буквы</label>
+          <button class="btn" id="reloadBtn" title="Перечитать lists.json">🔃 Обновить списки</button>
         </div>
 
-        <div class="preview" id="weekPreview" aria-live="polite"></div>
+        <details id="previewWrap" style="margin-top:8px" open>
+          <summary class="summaryLine">📚 Список слов недели <span id="previewCount" class="count"></span></summary>
+          <div class="preview" id="weekPreview" aria-live="polite"></div>
+        </details>
 
         <div id="validateBox">
           <div id="validateSummary" class="muted"></div>
@@ -92,22 +98,25 @@
           <label>Режим:</label>
           <label class="chip"><input type="radio" name="mode" value="lcwc" checked> Look → Cover → Write → Check</label>
           <label class="chip"><input type="radio" name="mode" value="dictation"> Диктовка</label>
-          <label class="chip"><span class="muted">Показ</span>
+          <label class="chip"><span class="muted">⏱️ Показ</span>
             <input type="number" id="lookSecs" min="0" max="10" step="0.5" value="2" style="width:90px"> сек
           </label>
         </div>
         <div class="row" id="voiceRow" style="display:none;margin-top:6px">
-          <label class="chip" title="Голос для диктовки" style="min-width:260px"><span class="muted">Voice</span>
+          <label class="chip" title="Голос для диктовки" style="min-width:260px"><span class="muted">🗣️ Voice</span>
             <select id="voiceSelect" style="min-width:220px"></select>
           </label>
           <label class="chip"><span class="muted">Rate</span> <input type="range" id="rate" min="0.7" max="1.3" step="0.05" value="1" style="width:160px"></label>
           <span id="ttsWarn" class="muted" style="display:none">Речь недоступна в этом браузере.</span>
         </div>
+
+        <div style="margin-top:10px">
+          <button class="btn primary big block" id="startBtn">▶️ Start quiz</button>
+        </div>
+
         <div class="row" style="margin-top:10px">
-          <button class="btn primary" id="startBtn">Start quiz</button>
-          <button class="btn" id="errorsOnlyBtn" disabled>Повторить ошибки</button>
-          <button class="btn" id="workMistakesBtn" disabled>Работа над ошибками</button>
-          <button class="btn" id="clearErrorsBtn" disabled>Очистить ошибки</button>
+          <button class="btn" id="errorsOnlyBtn" disabled>🛠️ Работа над ошибками</button>
+          <button class="btn" id="clearErrorsBtn" disabled>🧹 Очистить ошибки</button>
         </div>
       </section>
 
@@ -117,12 +126,12 @@
           <input type="text" id="answer" placeholder="Введите слово и нажмите Enter"
                  autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
                  inputmode="latin">
-          <button class="btn" id="checkBtn">Check</button>
+          <button class="btn" id="checkBtn">✅ Check</button>
         </div>
         <div class="row" style="margin-top:10px">
-          <button class="btn" id="repeatBtn" disabled>Repeat</button>
-          <button class="btn" id="revealBtn" disabled>Reveal</button>
-          <button class="btn" id="skipBtn" disabled>Skip</button>
+          <button class="btn" id="repeatBtn" disabled>🔁 Repeat</button>
+          <button class="btn" id="revealBtn" disabled>👁️ Reveal</button>
+          <button class="btn" id="skipBtn" disabled>⏭️ Skip</button>
           <span class="muted" id="progress" style="margin-left:auto">0 / 0</span>
         </div>
         <div id="feedback" class="muted" style="min-height:24px;margin-top:8px"></div>
@@ -142,18 +151,18 @@
     const $ = (s)=>document.querySelector(s);
     // Elements
     const weekSelect=$('#weekSelect'), prevWeekBtn=$('#prevWeekBtn'), nextWeekBtn=$('#nextWeekBtn');
-    const weekPreview=$('#weekPreview');
+    const previewWrap=$('#previewWrap'), weekPreview=$('#weekPreview'), previewCount=$('#previewCount');
     const validateBox=$('#validateBox'), validateSummary=$('#validateSummary'), validateDetails=$('#validateDetails');
     const shuffleBtn=$('#shuffleBtn'), reloadBtn=$('#reloadBtn');
     const countEl=$('#count'), accEl=$('#acc'), timerEl=$('#timer');
     const startBtn=$('#startBtn'), pauseBtn=$('#pauseBtn'), resumeBtn=$('#resumeBtn'), resetTimerBtn=$('#resetTimerBtn');
-    const modeRadios=document.querySelectorAll('input[name="mode"]'); const caseSensitive=$('#caseSensitive');
+    const modeRadios=document.querySelectorAll('input[name="mode"]'); const caseSensitive=$('#caseSensitive'); const speakOnType=$('#speakOnType');
     const lookSecsInput=$('#lookSecs');
     const voiceRow=$('#voiceRow'), voiceSelect=$('#voiceSelect'), rate=$('#rate'), ttsWarn=$('#ttsWarn');
     const cnv=$('#cnv'), ctx=cnv.getContext('2d'); const dpr=window.devicePixelRatio||1;
     const answerRow=$('#answerRow'), answer=$('#answer'), checkBtn=$('#checkBtn');
     const repeatBtn=$('#repeatBtn'), revealBtn=$('#revealBtn'), skipBtn=$('#skipBtn'), progress=$('#progress'), feedback=$('#feedback');
-    const mistakesList=$('#mistakes'), errorsOnlyBtn=$('#errorsOnlyBtn'), workMistakesBtn=$('#workMistakesBtn'), clearErrorsBtn=$('#clearErrorsBtn');
+    const mistakesList=$('#mistakes'), errorsOnlyBtn=$('#errorsOnlyBtn'), clearErrorsBtn=$('#clearErrorsBtn');
 
     const LISTS_URL='./lists.json';
 
@@ -164,11 +173,15 @@
       loadMistakes:()=>{try{return JSON.parse(localStorage.getItem('sptr:misc:m')||'[]')}catch(e){return []}},
       saveWeekIdx:(i)=>localStorage.setItem('sptr:weekIdx', String(i)),
       loadWeekIdx:()=>{const v=parseInt(localStorage.getItem('sptr:weekIdx')); return isFinite(v)?v:0;},
+      saveVoice:(name)=>localStorage.setItem('sptr:voiceName', name||''),
+      loadVoice:()=>localStorage.getItem('sptr:voiceName')||'',
+      saveSpeakOnType:(v)=>localStorage.setItem('sptr:speakOnType', v?'1':'0'),
+      loadSpeakOnType:()=>localStorage.getItem('sptr:speakOnType')==='1',
     };
 
     const state={ weeks:[], words:[], idx:0, attempts:0, correct:0, running:false,
       timerOn:false,startTs:0, elapsed:0, mode:()=>document.querySelector('input[name="mode"]:checked').value,
-      phase:'idle', mistakes:[], lookTimer:null, ttsPrimed:false };
+      phase:'idle', mistakes:[], lookTimer:null, ttsPrimed:false, lastTyped:'' };
 
     // Fetch lists
     async function loadLists(cacheBust=false){
@@ -203,7 +216,7 @@
       setWords(w.words||[]);
       drawTextCentered('Выбрано: '+ (w.name||('Week '+(idx+1))) +' — '+ state.words.length +' слов',{fontSize:18});
       renderPreview();
-      runValidation(false); // show validation state, но не блокируем UX до старта
+      runValidation(false);
     }
 
     // Week navigation
@@ -215,8 +228,8 @@
       weekSelect.value = String(idx);
       applyWeek();
     }
-    prevWeekBtn.addEventListener('click', ()=>changeWeek(-1));
-    nextWeekBtn.addEventListener('click', ()=>changeWeek(1));
+    document.getElementById('prevWeekBtn').addEventListener('click', ()=>changeWeek(-1));
+    document.getElementById('nextWeekBtn').addEventListener('click', ()=>changeWeek(1));
     document.addEventListener('keydown', (e)=>{
       const tag=(document.activeElement && document.activeElement.tagName) || '';
       if(['INPUT','TEXTAREA','SELECT'].includes(tag)) return;
@@ -227,6 +240,7 @@
 
     // Preview
     function renderPreview(){
+      document.getElementById('previewCount').textContent = '('+state.words.length+' слов)';
       weekPreview.innerHTML = state.words.length
         ? state.words.map(w=>'<span class="tag">'+escapeHtml(w)+'</span>').join('')
         : '<span class="muted">В этой неделе пока нет слов</span>';
@@ -234,7 +248,7 @@
     function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
 
     // Validation
-    const reWord = /^[A-Za-z]+(?:['’\-][A-Za-z]+)*$/; // буквы + апостроф/дефис внутри
+    const reWord = /^[A-Za-z]+(?:['’\-][A-Za-z]+)*$/;
     const MAXLEN = 32;
     function normalizeKey(w){ return (w||'').toLowerCase().replace(/[’]/g,"'"); }
     function validateWords(words){
@@ -280,7 +294,7 @@
           startBtn.disabled=true;
           return false;
         } else {
-          startBtn.disabled=false; // позволяем запустить, но при старте проверим жёстко
+          startBtn.disabled=false;
           return false;
         }
       }
@@ -302,11 +316,57 @@
 
     // TTS
     let voices=[]; const hasTTS=('speechSynthesis' in window);
-    function fillVoices(){ if(!hasTTS) return; voiceSelect.innerHTML=''; const list=voices.length? voices : window.speechSynthesis.getVoices(); const preferred=list.filter(v=>/^en(-|$)/i.test(v.lang)); const src=preferred.length? preferred : list; src.forEach(v=>{ const o=document.createElement('option'); o.value=v.name; o.textContent=v.name+' — '+v.lang; voiceSelect.appendChild(o); }); }
-    function ensureVoicesReady(timeout){ timeout=timeout||2000; return new Promise(res=>{ if(!hasTTS) return res(false); const start=Date.now(); (function wait(){ voices=window.speechSynthesis.getVoices(); if(voices.length || Date.now()-start>timeout){ fillVoices(); res(voices.length>0); } else { setTimeout(wait,100); } })(); }); }
+    function fillVoices(){ if(!hasTTS) return; voices = window.speechSynthesis.getVoices(); voiceSelect.innerHTML='';
+      const stored = store.loadVoice();
+      const en = voices.filter(v=>/^en(-|$)/i.test(v.lang));
+      const preferOrder = ['Samantha','Daniel','Alex','Moira','Serena','Tessa','Victoria','Zoe','Allison','Ava','Nicky','Joanna','Matthew','Amy','Brian','Emma','Google US English'];
+      function score(v){
+        let s=0;
+        if(v.lang.startsWith('en-US')) s+=5;
+        if(v.lang.startsWith('en-GB')) s+=4;
+        if(/en-AU/.test(v.lang)) s+=0; // deprioritize
+        if(/karen/i.test(v.name)) s-=5;
+        const idx = preferOrder.findIndex(n=>v.name.includes(n));
+        if(idx>=0) s += (preferOrder.length-idx);
+        return s;
+      }
+      const sorted = (en.length? en : voices.slice()).sort((a,b)=>score(b)-score(a));
+      sorted.forEach(v=>{
+        const o=document.createElement('option');
+        o.value=v.name; o.textContent=v.name+' — '+v.lang;
+        voiceSelect.appendChild(o);
+      });
+      const toSelect = (stored && voices.find(v=>v.name===stored)) ? stored : (sorted[0]?.name || '');
+      if(toSelect){ voiceSelect.value = toSelect; store.saveVoice(toSelect); }
+    }
+    function getSelectedVoice(){
+      const name = voiceSelect.value || store.loadVoice();
+      if(!hasTTS) return null;
+      const list = window.speechSynthesis.getVoices();
+      const match = list.find(v=>v.name===name);
+      return match || list.find(v=>/^en(-|$)/i.test(v.lang)) || list[0] || null;
+    }
+    function ensureVoicesReady(timeout){ timeout=timeout||2500; return new Promise(res=>{
+      if(!hasTTS) return res(false);
+      const start=Date.now();
+      (function wait(){
+        const got = window.speechSynthesis.getVoices();
+        if(got.length || Date.now()-start>timeout){ fillVoices(); res(got.length>0); } else { setTimeout(wait,100); }
+      })();
+    }); }
     function primeTTS(){ if(!hasTTS || state.ttsPrimed) return; try{ const u=new SpeechSynthesisUtterance(' '); u.volume=0; window.speechSynthesis.speak(u); state.ttsPrimed=true; }catch(e){} }
-    function speak(text){ if(!hasTTS){ feedback.textContent='Режим диктовки недоступен (нет TTS)'; return; } window.speechSynthesis.cancel(); try{ window.speechSynthesis.resume(); }catch(e){} const u=new SpeechSynthesisUtterance(text); const v=voices[0] || window.speechSynthesis.getVoices()[0]; if(v){ u.voice=v; u.lang=v.lang; } u.rate=parseFloat(rate?.value||'1'); window.speechSynthesis.speak(u); }
-    if(hasTTS){ window.speechSynthesis.onvoiceschanged=()=>{ voices=window.speechSynthesis.getVoices(); fillVoices(); }; } else { ttsWarn.style.display='inline'; }
+    function speak(text, opts){
+      if(!hasTTS) return;
+      window.speechSynthesis.cancel();
+      try{ window.speechSynthesis.resume(); }catch(e){}
+      const u=new SpeechSynthesisUtterance(text);
+      const v = getSelectedVoice();
+      if(v){ u.voice=v; u.lang=v.lang; }
+      if(opts && typeof opts.rate==='number') u.rate = opts.rate; else u.rate=parseFloat(rate?.value||'1');
+      window.speechSynthesis.speak(u);
+    }
+    if(hasTTS){ window.speechSynthesis.onvoiceschanged=fillVoices; } else { ttsWarn.style.display='inline'; }
+    voiceSelect?.addEventListener('change', ()=>{ store.saveVoice(voiceSelect.value); });
 
     // Flow
     function setWords(words){ state.words = words.slice(); state.idx=0; displayCount(); }
@@ -315,10 +375,10 @@
     function showAcc(){ const a=accuracy(); accEl.textContent=(a==null? '—' : (state.correct+' / '+state.attempts+' ('+a+'%)')); }
 
     function startQuiz(){
-      // Validate before start
       if(!runValidation(true)) return;
       if(!state.words.length){ drawTextCentered('В этой неделе нет слов',{fontSize:18}); return; }
-      state.running=true; state.attempts=0; state.correct=0; showAcc(); displayCount(); state.idx=0; answer.value='';
+      state.running=true; state.attempts=0; state.correct=0; showAcc(); displayCount(); state.idx=0; answer.value=''; state.lastTyped='';
+      previewWrap.open = false;
       if(state.mode()==='lcwc'){ enterLook(); } else { dictationStart(); }
       startTimer(); enableRunBtns(true);
     }
@@ -340,12 +400,33 @@
       const ok=(typed===target); state.attempts++; if(ok) state.correct++; showAcc();
       if(!ok){ addMistake({word:w, typed:typedRaw}); }
       feedback.innerHTML = ok? '<span class="ok">Верно!</span>' : '<span class="bad">Неверно</span>: <b>'+ (typedRaw||'∅') +'</b> → <b>'+ w +'</b>';
-      answer.value=''; nextWord(); if(state.mode()==='lcwc'){ enterLook(); } else { renderDictation(true); }
+      answer.value=''; state.lastTyped=''; nextWord(); if(state.mode()==='lcwc'){ enterLook(); } else { renderDictation(true); }
     }
 
+    // Per-letter spelling while typing
+    const LETTER_NAMES = {
+      a:'A', b:'B', c:'C', d:'D', e:'E', f:'F', g:'G', h:'H', i:'I', j:'J', k:'K', l:'L',
+      m:'M', n:'N', o:'O', p:'P', q:'Q', r:'R', s:'S', t:'T', u:'U', v:'V', w:'W', x:'X', y:'Y', z:'Z',
+      '-':'dash', "'":"apostrophe"
+    };
+    function speakLetter(ch){
+      if(!speakOnType.checked) return;
+      if(!/^[A-Za-z'-]$/.test(ch)) return;
+      primeTTS(); ensureVoicesReady(1200).then(()=>{
+        window.speechSynthesis.cancel();
+        const name = LETTER_NAMES[ch.toLowerCase()] || ch;
+        speak(name, {rate:1.0});
+      });
+    }
+    answer.addEventListener('keydown', (e)=>{
+      if(!speakOnType.checked) return;
+      if(e.key.length===1){ speakLetter(e.key); }
+    });
+    speakOnType.addEventListener('change', ()=>store.saveSpeakOnType(speakOnType.checked));
+
     // Mistakes persistent
-    function addMistake(m){ state.mistakes.push(m); store.saveMistakes(state.mistakes); const li=document.createElement('li'); li.textContent='• '+m.word+' — вы ввели: '+(m.typed||'∅'); mistakesList.appendChild(li); errorsOnlyBtn.disabled=false; workMistakesBtn.disabled=false; clearErrorsBtn.disabled=false; }
-    function loadMistakesUI(){ mistakesList.innerHTML=''; state.mistakes.forEach(m=>{ const li=document.createElement('li'); li.textContent='• '+m.word+' — вы ввели: '+(m.typed||'∅'); mistakesList.appendChild(li); }); const has=state.mistakes.length>0; errorsOnlyBtn.disabled=!has; workMistakesBtn.disabled=!has; clearErrorsBtn.disabled=!has; }
+    function addMistake(m){ state.mistakes.push(m); store.saveMistakes(state.mistakes); const li=document.createElement('li'); li.textContent='• '+m.word+' — вы ввели: '+(m.typed||'∅'); mistakesList.appendChild(li); errorsOnlyBtn.disabled=false; clearErrorsBtn.disabled=false; }
+    function loadMistakesUI(){ mistakesList.innerHTML=''; state.mistakes.forEach(m=>{ const li=document.createElement('li'); li.textContent='• '+m.word+' — вы ввели: '+(m.typed||'∅'); mistakesList.appendChild(li); }); const has=state.mistakes.length>0; errorsOnlyBtn.disabled=!has; clearErrorsBtn.disabled=!has; }
     function errorsOnly(){ if(!state.mistakes.length){ drawTextCentered('Ошибок нет',{fontSize:18}); return; } const uniq=[...new Set(state.mistakes.map(m=>m.word))]; setWords(uniq); feedback.textContent='Режим: работа над ошибками'; if(state.mode()==='lcwc'){ enterLook(); } else { renderDictation(true); } }
     function clearErrors(){ state.mistakes=[]; store.saveMistakes([]); loadMistakesUI(); }
 
@@ -366,7 +447,6 @@
     answer.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); checkAnswer(); } });
 
     errorsOnlyBtn.addEventListener('click', errorsOnly);
-    workMistakesBtn.addEventListener('click', errorsOnly);
     clearErrorsBtn.addEventListener('click', clearErrors);
 
     modeRadios.forEach(r=>r.addEventListener('change', ()=>{
@@ -378,13 +458,17 @@
     lookSecsInput.addEventListener('change', ()=>{ const v=Math.max(0, Math.min(10, parseFloat(lookSecsInput.value)||0)); lookSecsInput.value=v; store.saveLookSecs(v); });
     function lookSecs(){ return Math.max(0, Math.min(10, parseFloat(lookSecsInput.value)||2)); }
 
+    reloadBtn.addEventListener('click', ()=>loadLists(true));
+
     // Init
     function init(){
       lookSecsInput.value = store.loadLookSecs();
+      speakOnType.checked = store.loadSpeakOnType();
       state.mistakes = store.loadMistakes();
       loadMistakesUI();
       drawTextCentered('Загружаем списки…',{fontSize:18});
       loadLists();
+      ensureVoicesReady().then(()=>{ /* pick stored/best voice */ });
     }
     init();
 
